@@ -47,7 +47,7 @@ def keep(path):
         return False
     if path in EXCLUDE_FILES:
         return False
-    if path.endswith(".idsig") or ".bak-" in path:
+    if path.endswith((".idsig", ".pyc")) or ".bak-" in path:
         return False
     if path.endswith(".keystore"):
         return False
@@ -61,7 +61,7 @@ def collect():
         pruned = []
         for d in dirs:
             rel = d if relroot == "." else relroot + "/" + d
-            if rel in (".git", "app/build", "docs"):
+            if rel in (".git", "app/build", "docs", "__pycache__", "relay/__pycache__"):
                 pruned.append(d)
         dirs[:] = [d for d in dirs if d not in pruned]
         for n in names:

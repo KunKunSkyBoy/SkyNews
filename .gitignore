@@ -12,3 +12,7 @@ skynews.apk.bak-*
 
 # 本地临时
 *.log
+
+# Python 缓存
+__pycache__/
+*.pyc
