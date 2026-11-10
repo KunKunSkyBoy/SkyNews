@@ -108,7 +108,10 @@ https://sixhorse.game.163.com/news/outer/newslist_search.do?start=1&limit=40&con
 - `.github/workflows/relay.yml`：每 10 分钟跑一次并提交到 `docs/`，GitHub Pages 直接给出 URL
 - 源：TapTap / 官网 / B 站（零配置）· 微博（`WEIBO_COOKIE`）· 抖音/小红书/微博兜底（`RSSHUB_BASE`）
 - 本地实测：**53 条**（官网 30 + B 站 13 + TapTap 10）；没配的源只写进 `problems`，不影响其它源
+- GitHub Actions 上实测：官网/TapTap 正常，**B 站返回 412**（境外 IP 被 B 站地域拦截）——B 站条目由 App 本地抓，中继里缺它不影响
 - App 端：设置 → **云中继地址** 填 `https://<user>.github.io/<repo>/feed.json`，条目以「中继」来源并入
+- **已部署实例**：<https://kunkunskyboy.github.io/SkyNews/feed.json>（GitHub Pages，App v2.4 起默认用它）
+- App 端按 id 去重：中继里的官网/TapTap/B站条目与本地抓到的同 id 条目只保留一条
 
 部署步骤见 [`relay/README.md`](relay/README.md)。
 

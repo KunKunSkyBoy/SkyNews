@@ -84,6 +84,8 @@ public class MainActivity extends Activity {
     static final String U_BILI_DYN = "https://api.bilibili.com/x/polymer/web-dynamic/v1/feed/space";
     static final long BILI_MID = 211700578L; // 光遇手游（B 站官方，认证 2.6M 粉）
     static final String UA_WEB = "Mozilla/5.0 (Linux; Android 13; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36";
+    /** 已部署的云中继（GitHub Pages）：未手动设置时默认拉这里 */
+    static final String U_RELAY_DEFAULT = "https://kunkunskyboy.github.io/SkyNews/feed.json";
     static final String CH_FEED = "sky_feed_channel";
     static final int NID_FEED = 1003;
     static final String CH_ANN = "sky_ann_channel";
@@ -714,18 +716,23 @@ public class MainActivity extends Activity {
         }
 
         // 5) 云中继（可选）：微博/抖音/小红书由云端抓，App 只拉统一 JSON
-        String relay = pref(ctx).getString("relay_url", "");
+        String relay = pref(ctx).getString("relay_url", U_RELAY_DEFAULT);
         if (!relay.isEmpty()) {
             try {
                 String body = http(relay, null, null);
                 JSONArray arr;
                 if (body.trim().startsWith("[")) arr = new JSONArray(body);
                 else arr = new JSONObject(body).optJSONArray("items");
+                java.util.Set<String> have = new java.util.HashSet<>();
+                for (JSONObject x : items) have.add(x.optString("id", ""));
                 for (int i = 0; arr != null && i < arr.length(); i++) {
                     JSONObject o = arr.optJSONObject(i);
                     if (o == null) continue;
+                    String baseId = o.optString("id", "i" + i);
+                    if (have.contains(baseId)) continue;   // 本地已抓到（官网/TapTap/B站），不重复
+                    have.add(baseId);
                     JSONObject it = new JSONObject();
-                    it.put("id", "rl-" + o.optString("id", "i" + i));
+                    it.put("id", "rl-" + baseId);
                     it.put("src", o.optString("src", "中继"));
                     it.put("t", o.optString("t", ""));
                     it.put("ts", o.optLong("ts", 0));
@@ -1077,7 +1084,7 @@ public class MainActivity extends Activity {
         content.addView(section("云中继（可选，补微博 / 抖音 / 小红书）"));
         EditText et = new EditText(this);
         et.setHint("https://<user>.github.io/<repo>/feed.json");
-        et.setText(sp.getString("relay_url", ""));
+        et.setText(sp.getString("relay_url", U_RELAY_DEFAULT));
         et.setTextSize(13);
         et.setTextColor(C_TEXT);
         et.setHintTextColor(C_DIM);

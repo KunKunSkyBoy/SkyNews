@@ -1,7 +1,7 @@
 # 光遇公告 App（com.dsh.skynews）使用说明
 
 ## 装在哪
-- APK：`/storage/emulated/0/MT2/mcp/SkyNews/skynews.apk`（187,194 B，v2.3 / versionCode 5，已签名，装机名「光遇公告」）
+- APK：`/storage/emulated/0/MT2/mcp/SkyNews/skynews.apk`（187,194 B，v2.4 / versionCode 6，已签名，装机名「光遇公告」）
 - 源码：`/storage/emulated/0/MT2/mcp/SkyNews/app/`（MainActivity.java 60 KB + AndroidManifest.xml）
 
 ## 数据从哪里来（公开 GET，无需登录）
@@ -17,13 +17,13 @@
 
 全部是公开 GET、无需登录、http/https 都行，所以**不需要抓包、不需要开游戏**。
 
-## 六个页签（v2.3）
+## 六个页签（v2.4）
 1. **公告**：全文（10 小节，金色小标题渲染）+ 底部「复制全文 / 原文 / 刷新」
 2. **动态**：TapTap 官方帖 + B 站官方动态 + 官网新闻的统一时间线（按时间倒序，点条目跳原文）；有新条目发通知
 3. **变更历史**：公告变化时自动留档，可回看旧版本
 4. **设置**：
    - 官方动态源：TapTap / B 站 / 官网（App 内可抓）、微博（当前网络被风控，点此手动打开）
-   - 云中继地址：填 `https://<user>.github.io/<repo>/feed.json` 后，微博/抖音/小红书动态会经云端并入（见 `relay/README.md`）
+   - 云中继地址：默认 `https://kunkunskyboy.github.io/SkyNews/feed.json`（已部署）；微博/抖音/小红书动态经云端并入（见 `relay/README.md`）
    - 检测频率：15 / 30 / 60 / 120 分钟
    - 常驻监控：开前台服务（通知栏常驻，JobScheduler 兜底，已实测 `isForeground=true`）
    - 状态：上次检测 / 上次变更 / 公告指纹 / 服务器日期 / 数据源
