@@ -1,0 +1,46 @@
+name: skynews-relay
+
+# 每 10 分钟抓一次官方动态，把 feed.json / feed.xml 提交到 docs/，由 GitHub Pages 提供。
+# 注意：GitHub 的 schedule 在高峰期经常延迟（5~20 分钟），要更准时就上自建服务器跑同一个 relay.py。
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: skynews-relay
+  cancel-in-progress: false
+
+jobs:
+  relay:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 抓取并生成 feed
+        env:
+          # 可选：微博 cookie（Settings → Secrets and variables → Actions → New repository secret）
+          WEIBO_COOKIE: ${{ secrets.WEIBO_COOKIE }}
+          # 可选：可用 RSSHub 地址（Settings → Variables），用于抖音/小红书/微博兜底
+          RSSHUB_BASE: ${{ vars.RSSHUB_BASE }}
+        run: python3 relay/relay.py --out docs --print
+
+      - name: 提交结果
+        run: |
+          git config user.name "skynews-relay"
+          git config user.email "relay@users.noreply.github.com"
+          git add docs/feed.json docs/feed.xml
+          if git diff --cached --quiet; then
+            echo "no change"
+          else
+            git commit -m "relay: $(date -u +%FT%TZ)"
+            git push
+          fi

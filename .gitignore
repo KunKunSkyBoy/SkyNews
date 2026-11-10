@@ -1,0 +1,14 @@
+# 凭据：绝不入库
+GitHubtoken.txt
+*.token
+*.pem
+*.keystore
+app/debug.keystore
+
+# 构建中间产物
+app/build/
+*.idsig
+skynews.apk.bak-*
+
+# 本地临时
+*.log
