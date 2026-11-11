@@ -808,7 +808,7 @@ public class MainActivity extends Activity {
             card.addView(head);
 
             String fullText = o.optString("text", "");
-            String brief = fullText.length() > 220 ? fullText.substring(0, 220) + "…" : fullText;
+            String brief = fullText.length() > 600 ? fullText.substring(0, 600) + "…（点开看全文）" : fullText;
             TextView body = tv(brief, 14, stale ? C_DIM : C_TEXT, false);
             body.setLineSpacing(dp(4), 1f);
             body.setPadding(0, dp(8), 0, 0);
@@ -1773,7 +1773,7 @@ public class MainActivity extends Activity {
         }
 
         content.addView(section("关于"));
-        content.addView(tv("SkyNews（光遇公告阅读器）v2.6 (8)", 13, C_TEXT, true));
+        content.addView(tv("SkyNews（光遇公告阅读器）v2.7 (9)", 13, C_TEXT, true));
         content.addView(tv("数据源：官方公告/新闻、TapTap、B站、云中继；抓取失败会保留旧条目（灰显）", 11, C_DIM, false));
         content.addView(tv("构建：无 Gradle（javac + aapt2 + d8 + apksigner）", 11, C_DIM, false));
 
@@ -2523,16 +2523,17 @@ public class MainActivity extends Activity {
         }
     }
 
-    /** 点卡片：有链接走阅读页；没有链接但有全文 → 阅读页显示全文 */
+    /** 点卡片：有正文 → 阅读页显示全文（可再跳浏览器）；没有正文才直接开链接 */
     private void openItem(String url, String title, String text) {
-        if (url != null && !url.isEmpty()) {
-            open(url);
-        } else if (text != null && !text.trim().isEmpty()) {
+        if (text != null && !text.trim().isEmpty()) {
             Intent i = new Intent(this, ReaderActivity.class);
             i.putExtra("content", (title == null ? "" : title + "\n\n") + text);
+            i.putExtra("url", url == null ? "" : url);
             startActivity(i);
+        } else if (url != null && !url.isEmpty()) {
+            open(url);
         } else {
-            toast("没有可打开的链接");
+            toast("没有可打开的内容");
         }
     }
 
