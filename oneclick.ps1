@@ -103,12 +103,25 @@ function Deploy-GitHub {
             if (-not (Test-Path $s)) { continue }
             $d = Join-Path $clone $it.dst
             if ($it.dir) {
-                New-Item -ItemType Directory -Force (Split-Path $d) | Out-Null
-                Copy-Item $s $d -Recurse -Force
+                # 目录用「先删后拷」保证与本地一致（避免嵌套副本 / 旧文件残留）
+                if ($it.dst -eq 'docs' -and (Test-Path (Join-Path $d 'feed.json'))) {
+                    # docs 由 CI 维护，已有 feed 时不覆盖，避免把线上较新的 feed 回滚
+                    continue
+                }
+                if (Test-Path $d) { Remove-Item $d -Recurse -Force }
+                New-Item -ItemType Directory -Force $d | Out-Null
+                Copy-Item (Join-Path $s '*') $d -Recurse -Force
             } else {
                 New-Item -ItemType Directory -Force (Split-Path $d) | Out-Null
                 Copy-Item $s $d -Force
             }
+        }
+        # 清理历史遗留的嵌套副本（旧版脚本 Copy-Item 目录语义造成）
+        $badDirs = @('.github/workflows/workflows', 'relay/relay', 'tools/tools',
+                     'app/assets/assets', 'app/src/src', 'docs/docs', 'app/app')
+        foreach ($b in $badDirs) {
+            $bd = Join-Path $clone $b
+            if (Test-Path $bd) { Remove-Item $bd -Recurse -Force; Log "清理嵌套副本 $b" }
         }
         # 发布产物
         $apk = Join-Path $ROOT 'skynews.apk'

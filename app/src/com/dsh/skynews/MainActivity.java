@@ -1153,6 +1153,7 @@ public class MainActivity extends Activity {
                 }
                 // schema:2：逐源健康 + 失败源（失败源保留旧条目并灰显）
                 JSONObject srcs = relayDoc == null ? null : relayDoc.optJSONObject("sources");
+                java.util.Set<String> relayHealth = new java.util.HashSet<>();
                 if (srcs != null) {
                     java.util.Iterator<String> sk = srcs.keys();
                     while (sk.hasNext()) {
@@ -1160,13 +1161,16 @@ public class MainActivity extends Activity {
                         JSONObject so = srcs.optJSONObject(sn);
                         if (so == null) continue;
                         boolean sok = so.optBoolean("ok", true);
-                        markHealth(ctx, "中继·" + sn, sok, so.optInt("count", 0),
+                        String disp = relaySrcLabel(sn);
+                        relayHealth.add("中继·" + disp);
+                        markHealth(ctx, "中继·" + disp, sok, so.optInt("count", 0),
                                 so.optLong("elapsed_ms", 0), so.optString("error", ""));
-                        if (!sok) relayFailed.add(sn);
+                        if (!sok) relayFailed.add(disp);
                     }
+                    pruneHealth(ctx, "中继·", relayHealth);
                 }
-                // 旧 schema：problems 形如 "B站: HTTPError 412"
-                if (relayDoc != null) {
+                // 旧 schema：problems 形如 "B站: HTTPError 412"（有 sources 时忽略，避免重复显示）
+                if (relayDoc != null && srcs == null) {
                     JSONArray probs = relayDoc.optJSONArray("problems");
                     for (int i = 0; probs != null && i < probs.length(); i++) {
                         String p = probs.optString(i, "");
@@ -1192,6 +1196,7 @@ public class MainActivity extends Activity {
                     it.put("ts", o.optLong("ts", 0));
                     it.put("text", o.optString(schema2 ? "summary" : "text", o.optString("text", "")));
                     it.put("url", o.optString("url", ""));
+                    it.put("stale", o.optBoolean("stale", false));
                     items.add(it);
                 }
                 markHealth(ctx, "中继", true, arr == null ? 0 : arr.length(),
@@ -1768,7 +1773,7 @@ public class MainActivity extends Activity {
         }
 
         content.addView(section("关于"));
-        content.addView(tv("SkyNews（光遇公告阅读器）v2.5 (7)", 13, C_TEXT, true));
+        content.addView(tv("SkyNews（光遇公告阅读器）v2.6 (8)", 13, C_TEXT, true));
         content.addView(tv("数据源：官方公告/新闻、TapTap、B站、云中继；抓取失败会保留旧条目（灰显）", 11, C_DIM, false));
         content.addView(tv("构建：无 Gradle（javac + aapt2 + d8 + apksigner）", 11, C_DIM, false));
 
@@ -2379,6 +2384,39 @@ public class MainActivity extends Activity {
             return ni != null && ni.isConnected();
         } catch (Throwable e) {
             return true; // 拿不到状态时不阻塞抓取
+        }
+    }
+
+    /** 中继源 key → 中文显示名 */
+    static String relaySrcLabel(String key) {
+        if (key == null) return "源";
+        switch (key) {
+            case "official": return "官网";
+            case "tap":
+            case "taptap": return "TapTap";
+            case "bili": return "B站";
+            case "weibo": return "微博";
+            case "douyin": return "抖音";
+            case "xhs": return "小红书";
+            default: return key;
+        }
+    }
+
+    /** 清理已不存在的健康项（例如旧版本/旧 schema 的源名） */
+    static synchronized void pruneHealth(Context c, String prefix, java.util.Set<String> keep) {
+        try {
+            SharedPreferences sp = pref(c);
+            JSONObject all = new JSONObject(sp.getString("src_health", "{}"));
+            java.util.Iterator<String> it = all.keys();
+            java.util.List<String> del = new java.util.ArrayList<>();
+            while (it.hasNext()) {
+                String k = it.next();
+                if (k.startsWith(prefix) && !keep.contains(k)) del.add(k);
+            }
+            if (del.isEmpty()) return;
+            for (String k : del) all.remove(k);
+            sp.edit().putString("src_health", all.toString()).apply();
+        } catch (Throwable ignore) {
         }
     }
 
