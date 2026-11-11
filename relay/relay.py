@@ -22,6 +22,7 @@
 import argparse
 import base64
 import hashlib
+import io
 import html as html_mod
 import html
 import json
@@ -482,7 +483,7 @@ def _daily_from_oivio():
 
 def _daily_from_t1qq():
     """备用源：应天API 光遇每日任务（免费 key：SKYNEWS_T1QQ_KEY）。"""
-    key = (os.environ.get("SKYNEWS_T1QQ_KEY") or "").strip()
+    key = _t1qq_key()
     if not key:
         raise NotConfigured("未配置 SKYNEWS_T1QQ_KEY（应天API 免费密钥）")
     d = http_get_json("https://api.t1qq.com/api/sky/gyrw?key=" + urllib.parse.quote(key),
@@ -502,7 +503,7 @@ def _daily_from_t1qq():
 
 def src_extra():
     """光遇今日速览（应天API：季蜡/大蜡烛位置、免费魔法、季节倒计时）。"""
-    key = (os.environ.get("SKYNEWS_T1QQ_KEY") or "").strip()
+    key = _t1qq_key()
     if not key:
         raise NotConfigured("未配置 SKYNEWS_T1QQ_KEY（应天API 免费密钥）")
     lines = []
@@ -1139,6 +1140,20 @@ def _data_uri(raw):
     return "data:%s;base64,%s" % (mime, base64.b64encode(raw).decode())
 
 
+
+def _t1qq_key():
+    key = (os.environ.get("SKYNEWS_T1QQ_KEY") or "").strip()
+    if key:
+        return key
+    try:
+        p = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".t1qq.key")
+        if os.path.exists(p):
+            return io.open(p, encoding="utf-8").read().strip()
+    except Exception:  # noqa: BLE001
+        pass
+    return ""
+
+
 def _t1qq_img(ep, key):
     try:
         raw = http_get_bytes("https://api.t1qq.com/api/sky/sc/%s?key=%s"
@@ -1152,7 +1167,7 @@ def _t1qq_img(ep, key):
 
 def write_tools_html(out_dir, data):
     """生成 docs/tools.html：所有免费光遇工具（文字 + 图片），按天缓存。"""
-    key = (os.environ.get("SKYNEWS_T1QQ_KEY") or "").strip()
+    key = _t1qq_key()
     if not key:
         return
     today = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d")
@@ -1202,6 +1217,17 @@ def write_tools_html(out_dir, data):
         if uri:
             sections.append((ep, title, "", [uri]))
 
+    img_sections = sum(1 for _, _, _, im in sections if im)
+    old_path = os.path.join(out_dir, "tools.html")
+    if img_sections == 0 and os.path.exists(old_path):
+        try:
+            old_txt = io.open(old_path, encoding="utf-8").read()
+            if "<img" in old_txt:
+                print("tools.html kept (no images fetched this run)")
+                atomic_write(marker, today)
+                return
+        except Exception:  # noqa: BLE001
+            pass
     parts = []
     for sid, title, text, imgs in sections:
         img_html = "".join('<div class="imgwrap"><img src="%s"/></div>' % u for u in imgs)
