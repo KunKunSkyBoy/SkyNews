@@ -1,26 +1,26 @@
 {
  "schema": 2,
- "generated_at": "2026-11-11T17:27:34Z",
- "updated": "2026-11-11T17:27:34Z",
+ "generated_at": "2026-11-11T17:29:11Z",
+ "updated": "2026-11-11T17:29:11Z",
  "count": 30,
  "sources": {
   "official": {
    "ok": true,
    "count": 30,
    "error": null,
-   "elapsed_ms": 1354,
-   "last_success": "2026-11-11T17:26:56Z"
+   "elapsed_ms": 1598,
+   "last_success": "2026-11-11T17:28:35Z"
   },
   "weibo": {
    "ok": false,
    "count": 0,
-   "error": "RuntimeError: RSSHub 失败（HTTP Error 403: Forbidden），公开时间线也失败（公开时间线不可用：JSON 解析失败: Expecting value: line 1 column 1 (char 0)）（重试 3 次）",
-   "elapsed_ms": 39976,
+   "error": "RuntimeError: RSSHub 失败（HTTP Error 503: Service Unavailable），公开时间线也失败（公开时间线不可用：JSON 解析失败: Expecting value: line 1 column 1 (char 0)）（重试 3 次）",
+   "elapsed_ms": 37554,
    "last_success": null
   }
  },
  "problems": [
-  "微博: RuntimeError: RSSHub 失败（HTTP Error 403: Forbidden），公开时间线也失败（公开时间线不可用：JSON 解析失败: Expecting value: line 1 column 1 (char 0)）（重试 3 次）"
+  "微博: RuntimeError: RSSHub 失败（HTTP Error 503: Service Unavailable），公开时间线也失败（公开时间线不可用：JSON 解析失败: Expecting value: line 1 column 1 (char 0)）（重试 3 次）"
  ],
  "items": [
   {
