@@ -1165,6 +1165,32 @@ def _t1qq_img(ep, key):
     return ""
 
 
+
+def write_history(out_dir, data):
+    """把每天第一次抓到的数据落一份到 docs/history/YYYY-MM-DD.json（自建存档，~按天增长）。"""
+    try:
+        now = datetime.now(timezone(timedelta(hours=8)))
+        day = now.strftime("%Y-%m-%d")
+        hdir = os.path.join(out_dir, "history")
+        os.makedirs(hdir, exist_ok=True)
+        path = os.path.join(hdir, day + ".json")
+        if os.path.exists(path):
+            return
+        keep = []
+        for it in data.get("items") or []:
+            src = it.get("src") or it.get("source") or ""
+            if src in ("每日任务", "速览"):
+                keep.append({"src": src, "t": it.get("t"), "text": it.get("text"), "url": it.get("url")})
+        snap = {"date": day, "generated_at": data.get("generated_at"),
+                "sources": {k: {"ok": v.get("ok"), "count": v.get("count")}
+                            for k, v in (data.get("sources") or {}).items()},
+                "items": keep}
+        atomic_write(path, json.dumps(snap, ensure_ascii=False, indent=1))
+        print("history written:", day)
+    except Exception as e:  # noqa: BLE001
+        print("history skipped:", e)
+
+
 def write_tools_html(out_dir, data):
     """生成 docs/tools.html：所有免费光遇工具（文字 + 图片），按天缓存。"""
     key = _t1qq_key()
@@ -1300,6 +1326,10 @@ def main(argv=None):
         write_tools_html(args.out, data)
     except Exception as e:  # noqa: BLE001
         print("tools.html skipped:", e)
+    try:
+        write_history(args.out, data)
+    except Exception as e:  # noqa: BLE001
+        print("history skipped:", e)
     if args.show:
         print_summary(data)
 
