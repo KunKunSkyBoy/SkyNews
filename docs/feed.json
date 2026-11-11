@@ -1,9 +1,16 @@
 {
  "schema": 2,
- "generated_at": "2026-11-11T19:13:20Z",
- "updated": "2026-11-11T19:13:20Z",
+ "generated_at": "2026-11-11T19:20:19Z",
+ "updated": "2026-11-11T19:20:19Z",
  "count": 55,
  "sources": {
+  "douyin": {
+   "ok": false,
+   "count": 0,
+   "error": "NotConfigured: 未配置 RSSHUB_BASE / SKYNEWS_DOUYIN_ROUTE",
+   "elapsed_ms": 0,
+   "last_success": null
+  },
   "xhs": {
    "ok": false,
    "count": 0,
@@ -19,46 +26,39 @@
    "last_success": "2026-11-11T16:36:31Z",
    "stale": true
   },
-  "douyin": {
-   "ok": false,
-   "count": 0,
-   "error": "NotConfigured: 未配置 RSSHUB_BASE / SKYNEWS_DOUYIN_ROUTE",
-   "elapsed_ms": 0,
-   "last_success": null
-  },
   "daily": {
    "ok": true,
    "count": 1,
    "error": null,
-   "elapsed_ms": 715,
-   "last_success": "2026-11-11T19:13:02Z"
+   "elapsed_ms": 624,
+   "last_success": "2026-11-11T19:19:58Z"
   },
   "official": {
    "ok": true,
    "count": 30,
    "error": null,
-   "elapsed_ms": 1059,
-   "last_success": "2026-11-11T19:13:03Z"
+   "elapsed_ms": 1251,
+   "last_success": "2026-11-11T19:19:59Z"
   },
   "taptap": {
    "ok": true,
    "count": 10,
    "error": null,
-   "elapsed_ms": 1296,
-   "last_success": "2026-11-11T19:13:03Z"
+   "elapsed_ms": 1456,
+   "last_success": "2026-11-11T19:19:59Z"
   },
   "extra": {
    "ok": true,
    "count": 1,
    "error": null,
-   "elapsed_ms": 5522,
-   "last_success": "2026-11-11T19:13:07Z"
+   "elapsed_ms": 4828,
+   "last_success": "2026-11-11T19:20:02Z"
   },
   "weibo": {
    "ok": false,
    "count": 0,
    "error": "NotConfigured: 未配置 WEIBO_COOKIE/RSSHUB_BASE，公开时间线不可用（公开时间线不可用：JSON 解析失败: Expecting value: line 1 column 1 (char 0)）",
-   "elapsed_ms": 10225,
+   "elapsed_ms": 13154,
    "last_success": null
   }
  },
@@ -74,23 +74,23 @@
    "source": "extra",
    "title": "11月12日 光遇速览",
    "url": "https://www.ovoav.com/",
-   "time": "2026-11-11T19:13:07Z",
-   "summary": "季节蜡烛：霞谷2 大蜡烛：云野1 今日免费魔法：漂浮魔法 季剩余时间：62天20时45分53秒 有季卡完全毕业：62天 季节毕业所需：371季蜡",
+   "time": "2026-11-11T19:20:02Z",
+   "summary": "季节蜡烛：霞谷2 大蜡烛：云野1 今日免费魔法：漂浮魔法 季剩余时间：62天20时38分58秒 有季卡完全毕业：62天 季节毕业所需：371季蜡",
    "src": "速览",
-   "ts": 1794424387,
-   "t": "11-11 19:13",
-   "text": "11月12日 光遇速览\n季节蜡烛：霞谷2 大蜡烛：云野1 今日免费魔法：漂浮魔法 季剩余时间：62天20时45分53秒 有季卡完全毕业：62天 季节毕业所需：371季蜡"
+   "ts": 1794424802,
+   "t": "11-11 19:20",
+   "text": "11月12日 光遇速览\n季节蜡烛：霞谷2 大蜡烛：云野1 今日免费魔法：漂浮魔法 季剩余时间：62天20时38分58秒 有季卡完全毕业：62天 季节毕业所需：371季蜡"
   },
   {
    "id": "daily-20261112",
    "source": "daily",
    "title": "11月12日 每日任务",
    "url": "https://skydaily.nankki.com/",
-   "time": "2026-11-11T19:13:02Z",
+   "time": "2026-11-11T19:19:58Z",
    "summary": "今日每日任务： 1. 拾起一只螃蟹 2. 向一位玩家鞠躬 3. 在水母上回复能量 4. 向一位朋友招手 每日大蜡烛位置：在遇境/云巢里传送门门口处，若有两根小蜡烛在两边，即表示对应的地图里会有大蜡烛堆~ 今日无碎片降落",
    "src": "每日任务",
-   "ts": 1794424382,
-   "t": "11-11 19:13",
+   "ts": 1794424798,
+   "t": "11-11 19:19",
    "text": "11月12日 每日任务\n今日每日任务： 1. 拾起一只螃蟹 2. 向一位玩家鞠躬 3. 在水母上回复能量 4. 向一位朋友招手 每日大蜡烛位置：在遇境/云巢里传送门门口处，若有两根小蜡烛在两边，即表示对应的地图里会有大蜡烛堆~ 今日无碎片降落"
   },
   {

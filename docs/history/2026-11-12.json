@@ -1,0 +1,52 @@
+{
+ "date": "2026-11-12",
+ "generated_at": "2026-11-11T19:20:19Z",
+ "sources": {
+  "douyin": {
+   "ok": false,
+   "count": 0
+  },
+  "xhs": {
+   "ok": false,
+   "count": 0
+  },
+  "bili": {
+   "ok": false,
+   "count": 13
+  },
+  "daily": {
+   "ok": true,
+   "count": 1
+  },
+  "official": {
+   "ok": true,
+   "count": 30
+  },
+  "taptap": {
+   "ok": true,
+   "count": 10
+  },
+  "extra": {
+   "ok": true,
+   "count": 1
+  },
+  "weibo": {
+   "ok": false,
+   "count": 0
+  }
+ },
+ "items": [
+  {
+   "src": "速览",
+   "t": "11-11 19:20",
+   "text": "11月12日 光遇速览\n季节蜡烛：霞谷2 大蜡烛：云野1 今日免费魔法：漂浮魔法 季剩余时间：62天20时38分58秒 有季卡完全毕业：62天 季节毕业所需：371季蜡",
+   "url": "https://www.ovoav.com/"
+  },
+  {
+   "src": "每日任务",
+   "t": "11-11 19:19",
+   "text": "11月12日 每日任务\n今日每日任务： 1. 拾起一只螃蟹 2. 向一位玩家鞠躬 3. 在水母上回复能量 4. 向一位朋友招手 每日大蜡烛位置：在遇境/云巢里传送门门口处，若有两根小蜡烛在两边，即表示对应的地图里会有大蜡烛堆~ 今日无碎片降落",
+   "url": "https://skydaily.nankki.com/"
+  }
+ ]
+}
