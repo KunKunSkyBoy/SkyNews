@@ -6,6 +6,10 @@ on:
     branches: [main]
     paths:
       - "docs/**"
+  # relay 用 GITHUB_TOKEN 提交 docs 时不会再触发 push 事件，这里在 relay 跑完后补一次部署
+  workflow_run:
+    workflows: ["skynews-relay"]
+    types: [completed]
   workflow_dispatch:
 
 permissions:
