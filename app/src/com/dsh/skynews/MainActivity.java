@@ -47,6 +47,8 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.util.Calendar;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -93,7 +95,9 @@ public class MainActivity extends Activity {
     /** 已部署的云中继（GitHub Pages）：未手动设置时默认拉这里 */
     static final String U_RELAY_DEFAULT = "https://kunkunskyboy.github.io/SkyNews/feed.json";
     static final String CH_FEED = "sky_feed_channel";
+    static final String CH_DAILY = "sky_daily_channel";
     static final int NID_FEED = 1003;
+    static final int NID_DAILY = 1004;
     static final String CH_ANN = "sky_ann_channel";
     static final String CH_MON = "sky_mon_channel";
     static final int NID_ANN = 1001;
@@ -108,6 +112,8 @@ public class MainActivity extends Activity {
 
     /** 动态卡片默认预览字数；超过则显示「展开全文」（不再硬截断存储的正文）。 */
     static final int CARD_PREVIEW_CHARS = 600;
+    /** 自动展开的上限：超过这个字数仍先折叠，避免一屏塞几千字。 */
+    static final int AUTO_EXPAND_MAX = 4000;
 
     static int themeMode(Context c) {
         return pref(c).getInt("theme_mode", THEME_AUTO);
@@ -138,6 +144,8 @@ public class MainActivity extends Activity {
     private TextView tvStatus, tvRefresh;
     private ObjectAnimator spin;
     private TextView copyBtn;
+    /** 碎片页每分钟自刷新（进行中/剩余分钟） */
+    private boolean shardTimer = false;
     private final java.util.ArrayList<TextView> TOP_TEXTS = new java.util.ArrayList<>();
     static volatile String NET_LASTMOD = "";
     private ScrollView scroller;
@@ -148,8 +156,8 @@ public class MainActivity extends Activity {
     private EditText searchBar;
     private String searchQuery = "";
     private boolean favOnly = false;
-    /** 动态页里已原地展开全文的条目 id */
-    private final java.util.Set<String> expandedFeed = new java.util.HashSet<>();
+    /** 动态页里被用户手动切换过展开状态的条目 id（自动展开模式=已收起，折叠模式=已展开） */
+    private final java.util.Set<String> toggledFeed = new java.util.HashSet<>();
 
     // ---- 资料页（assets/sky 静态数据）----
     private int skyCat = 0;
@@ -163,6 +171,7 @@ public class MainActivity extends Activity {
         getWindow().setStatusBarColor(C_BG);
         getWindow().setNavigationBarColor(C_BG);
         ensureChannel(this);
+        requestNotifPermission(this);
         buildUi();
         render();
         refresh(false);
@@ -241,7 +250,9 @@ public class MainActivity extends Activity {
         tvRefresh = tv("↻", 22, C_ACCENT, true);
         tvRefresh.setGravity(Gravity.CENTER);
         tvRefresh.setBackground(round(C_CARD, 14));
-        tvRefresh.setOnClickListener(v -> refresh(true));
+        tvRefresh.setOnClickListener(v -> {
+            if (tab == 6) render(); else refresh(true);
+        });
         LinearLayout.LayoutParams rlp = lp(dp(46), dp(46));
         rlp.leftMargin = dp(8);
         head.addView(tvRefresh, rlp);
@@ -252,8 +263,8 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams tlp = lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         tlp.topMargin = dp(14);
         root.addView(tabRow, tlp);
-        String[] names = {"公告", "动态", "变更历史", "设置", "预载", "日历", "资料"};
-        String[] icons = {"ann", "feed", "hist", "set", "pre", "cal", "age"};
+        String[] names = {"公告", "动态", "变更历史", "设置", "预载", "日历", "碎片", "资料"};
+        String[] icons = {"ann", "feed", "hist", "set", "pre", "cal", "shard", "age"};
         for (int i = 0; i < names.length; i++) {
             final int idx = i;
             TextView t = tv(names[i], 12, C_DIM, true);
@@ -336,10 +347,17 @@ public class MainActivity extends Activity {
                 toast("已复制动态（" + txt.length() + " 字）");
                 return;
             }
+            if (tab == 6) {
+                String txt = shardText();
+                clip(txt);
+                toast("已复制碎片日程（" + txt.length() + " 字）");
+                return;
+            }
             String raw = pref(this).getString("ann_json", "");
             try {
                 JSONObject o = parseLoose(raw);
-                String text = o.optString("Title", "") + "\n\n" + o.optString("NeteaseMessage", "");
+                String text = o.optString("Title", "") + "\n\n"
+                        + cleanText(o.optString("NeteaseMessage", ""));
                 if (text.trim().length() < 5) throw new Exception();
                 clip(text);
                 toast("已复制（" + text.length() + " 字）");
@@ -358,7 +376,9 @@ public class MainActivity extends Activity {
 
         TextView age = pill("刷新", C_TEXT);
         putIcon(age, "ic_ui_refresh", C_TEXT);
-        age.setOnClickListener(v -> refresh(true));
+        age.setOnClickListener(v -> {
+            if (tab == 6) render(); else refresh(true);
+        });
         LinearLayout.LayoutParams al = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
         al.leftMargin = dp(10);
         bar.addView(age, al);
@@ -380,7 +400,7 @@ public class MainActivity extends Activity {
 
     private void render() {
         if (copyBtn != null) {
-            String label = tab == 5 ? "复制日历" : tab == 4 ? "复制预载" : tab == 1 ? "复制动态" : tab == 0 ? "复制全文" : "复制";
+            String label = tab == 6 ? "复制石头" : tab == 5 ? "复制日历" : tab == 4 ? "复制预载" : tab == 1 ? "复制动态" : tab == 0 ? "复制全文" : "复制";
             copyBtn.setText(label);
         }
         for (int i = 0; i < tabRow.getChildCount(); i++) {
@@ -395,7 +415,7 @@ public class MainActivity extends Activity {
             t.setBackground(g);
         }
         if (searchBar != null) {
-            searchBar.setVisibility(tab == 0 || tab == 1 || tab == 2 || tab == 6 ? View.VISIBLE : View.GONE);
+            searchBar.setVisibility(tab == 0 || tab == 1 || tab == 2 || tab == 7 ? View.VISIBLE : View.GONE);
         }
         content.removeAllViews();
         if (tab == 0) renderAnn();
@@ -403,7 +423,8 @@ public class MainActivity extends Activity {
         else if (tab == 2) renderHist();
         else if (tab == 4) renderPreload();
         else if (tab == 5) renderCalendar();
-        else if (tab == 6) renderSky();
+        else if (tab == 6) renderShard();
+        else if (tab == 7) renderSky();
         else renderSettings();
         updateStatus();
         animateIn();
@@ -705,7 +726,7 @@ public class MainActivity extends Activity {
                     o.optString("Title", ""), o.optString("NeteaseMessage", ""))) {
                 content.addView(hint("没有匹配「" + searchQuery + "」的内容"));
             } else {
-                addBody(o.optString("NeteaseMessage", ""));
+                addBody(cleanText(o.optString("NeteaseMessage", "")));
             }
         } catch (Exception e) {
             content.addView(hint("解析失败：" + e.getMessage()));
@@ -813,20 +834,23 @@ public class MainActivity extends Activity {
             card.addView(head);
 
             String fullText = o.optString("text", "");
-            final boolean expandable = fullText.length() > CARD_PREVIEW_CHARS;
-            final boolean expanded = expandedFeed.contains(id);
-            String shown = expanded || !expandable ? fullText
+            boolean autoExpand = pref(this).getBoolean("auto_expand", true);
+            final boolean longText = fullText.length() > CARD_PREVIEW_CHARS;
+            // 自动展开模式下默认整篇显示（超长文除外），用户点「收起」才折叠
+            final boolean auto = autoExpand && fullText.length() <= AUTO_EXPAND_MAX;
+            final boolean expanded = longText && (auto ? !toggledFeed.contains(id) : toggledFeed.contains(id));
+            String shown = (!longText || expanded) ? fullText
                     : fullText.substring(0, CARD_PREVIEW_CHARS).trim() + "\n…";
             TextView body = tv(shown, 14, stale ? C_DIM : C_TEXT, false);
             body.setLineSpacing(dp(4), 1f);
             body.setPadding(0, dp(8), 0, 0);
             card.addView(body);
-            if (expandable) {
+            if (longText) {
                 TextView toggle = tv(expanded ? "▲ 收起" : "▼ 展开全文（共 " + fullText.length() + " 字）",
                         12, C_ACCENT, true);
                 toggle.setPadding(0, dp(6), 0, 0);
                 toggle.setOnClickListener(v -> {
-                    if (expanded) expandedFeed.remove(id); else expandedFeed.add(id);
+                    if (expanded) toggledFeed.add(id); else toggledFeed.remove(id);
                     render();
                 });
                 card.addView(toggle);
@@ -915,12 +939,24 @@ public class MainActivity extends Activity {
     }
 
     /** 合并各源条目：按 id 去重、按 ts 倒序、最多保留 150 条。返回新增条数。 */
-    /** 公告正文规整：保留段落换行、压缩连续空行，**不截断**。 */
-    static String tidyBody(String s) {
+    /** 官网正文是 HTML 片段：<br> 转换行、去标签、反转义实体，得到纯文本。 */
+    static String cleanText(String s) {
         if (s == null) return "";
-        String t = s.replace("\r\n", "\n").replace("\r", "\n").replace('\u3000', ' ');
+        String t = s.replace("\r\n", "\n").replace("\r", "\n");
+        t = t.replaceAll("(?i)<br\\s*/?>", "\n");
+        t = t.replaceAll("(?i)</(p|div|li|tr|h[1-6])>", "\n");
+        t = t.replaceAll("<[^>]+>", "");
+        t = t.replace("&nbsp;", " ").replace("&amp;", "&").replace("&lt;", "<")
+                .replace("&gt;", ">").replace("&quot;", "\"").replace("&#39;", "'")
+                .replace("&#x27;", "'").replace("&apos;", "'");
+        t = t.replace('\u3000', ' ');
         t = t.replaceAll("[ \\t]+\\n", "\n").replaceAll("\\n{3,}", "\n\n");
         return t.trim();
+    }
+
+    /** 公告正文规整：保留段落换行、压缩连续空行，**不截断**。 */
+    static String tidyBody(String s) {
+        return cleanText(s);
     }
 
     /** 清掉同一标题、旧版 id（正文被截断）的公告条目，避免重抓后同一条出现两份。 */
@@ -1592,6 +1628,250 @@ public class MainActivity extends Activity {
         }
     }
 
+    static void requestNotifPermission(Context c) {
+        try {
+            if (Build.VERSION.SDK_INT >= 33 && c instanceof Activity) {
+                Activity a = (Activity) c;
+                if (a.checkSelfPermission("android.permission.POST_NOTIFICATIONS")
+                        != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                    a.requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 1001);
+                }
+            }
+        } catch (Throwable ignore) {
+        }
+    }
+
+    // ------------------------------------------------------------ 碎片页（红石 / 黑石，离线算法）
+
+    /** 一天的碎片信息（国服社区算法；非官方）。 */
+    static final class ShardDay {
+        boolean hasShard;
+        boolean isRed;
+        String reason = "";
+        String place = "";
+        double reward;
+        int[][] times;
+        int daysAhead;
+        int isoWeekday;
+    }
+
+    static final String[] SHARD_MAPS_TUE = {"云野·蝴蝶平原", "雨林·雨林小溪", "霞谷·溜冰场", "暮土·破败神庙", "禁阁·星光沙漠"};
+    static final String[] SHARD_MAPS_WED = {"云野·云中仙乡", "雨林·遗迹", "霞谷·溜冰场", "暮土·战场", "禁阁·星光沙漠"};
+    static final String[] SHARD_MAPS_FRI = {"云野·鸟巢", "雨林·大树屋", "霞谷·圆梦村", "暮土·螃蟹场", "禁阁·水母湾"};
+    static final String[] SHARD_MAPS_SAT = {"云野·洞穴", "雨林·雨林花园", "霞谷·圆梦村", "暮土·墓地", "禁阁·水母湾"};
+    static final String[] SHARD_MAPS_SUN = {"云野·圣岛", "雨林·高处空地", "霞谷·隐士山谷", "暮土·遗忘方舟", "禁阁·水母湾"};
+    static final double[] SHARD_REW_FRI = {2.5, 3.5, 2.5, 2.5, 3.5};
+    static final double[] SHARD_REW_SAT = {2, 2.5, 2.5, 2, 3.5};
+    static final String[] SHARD_WD = {"一", "二", "三", "四", "五", "六", "日"};
+
+    static int shardColor(boolean red) {
+        return red ? 0xFFFF6B6B : 0xFF9AA4B2;   // 红石=红，黑石=冷灰
+    }
+
+    static String trimNum(double v) {
+        return v == Math.floor(v) ? String.valueOf((int) v) : String.valueOf(v);
+    }
+
+    static String shardWin(int[] w) {
+        return String.format("%02d:%02d–%s", w[0], w[1],
+                w[2] == 24 ? "次日00:00" : String.format("%02d:%02d", w[2], w[3]));
+    }
+
+    static ShardDay shardDay(Calendar base) {
+        Calendar c = (Calendar) base.clone();
+        int day = c.get(Calendar.DAY_OF_MONTH);
+        int dow = c.get(Calendar.DAY_OF_WEEK);
+        int iso = dow == Calendar.SUNDAY ? 7 : dow - 1;
+        ShardDay s = new ShardDay();
+        s.isoWeekday = iso;
+        boolean noWeek = iso == 1 || iso == 4;
+        boolean noHalf = day <= 15 ? (iso == 3 || iso == 5) : (iso == 2 || iso == 6);
+        s.hasShard = !noWeek && !noHalf;
+        if (!s.hasShard) {
+            s.reason = noWeek ? "周一 / 周四固定无碎片"
+                    : (day <= 15 ? "1–15 号规则：周三 / 周五无碎片"
+                    : "16 号后规则：周二 / 周六无碎片");
+            return s;
+        }
+        int ri = (day + 2) % 5;
+        if (iso == 2) {
+            s.isRed = false;
+            s.place = SHARD_MAPS_TUE[ri];
+            s.times = new int[][]{{9, 8, 10, 0}, {14, 8, 15, 0}, {19, 8, 20, 0}};
+        } else if (iso == 3) {
+            s.isRed = false;
+            s.place = SHARD_MAPS_WED[ri];
+            s.times = new int[][]{{9, 8, 10, 0}, {15, 8, 16, 0}, {19, 8, 20, 0}};
+        } else if (iso == 5) {
+            s.isRed = true;
+            s.place = SHARD_MAPS_FRI[ri];
+            s.times = new int[][]{{11, 8, 12, 0}, {17, 8, 18, 0}, {23, 8, 24, 0}};
+            s.reward = SHARD_REW_FRI[ri];
+        } else if (iso == 6) {
+            s.isRed = true;
+            s.place = SHARD_MAPS_SAT[ri];
+            s.times = new int[][]{{10, 8, 11, 0}, {14, 8, 15, 0}, {22, 8, 23, 0}};
+            s.reward = SHARD_REW_SAT[ri];
+        } else {
+            s.isRed = true;
+            s.place = SHARD_MAPS_SUN[ri];
+            s.times = new int[][]{{7, 8, 8, 0}, {13, 8, 14, 0}, {19, 8, 20, 0}};
+            s.reward = 3.5;
+        }
+        return s;
+    }
+
+    static ShardDay nextShard(Calendar base, int horizon) {
+        for (int i = 1; i <= horizon; i++) {
+            Calendar c = (Calendar) base.clone();
+            c.add(Calendar.DAY_OF_MONTH, i);
+            ShardDay s = shardDay(c);
+            if (s.hasShard) {
+                s.daysAhead = i;
+                return s;
+            }
+        }
+        return null;
+    }
+
+    private void scheduleShardTick() {
+        if (shardTimer) return;
+        shardTimer = true;
+        ui.postDelayed(() -> {
+            shardTimer = false;
+            if (tab == 6) render();
+        }, 60000L);
+    }
+
+    private void renderShard() {
+        scheduleShardTick();
+        final Calendar now = Calendar.getInstance();
+        ShardDay t = shardDay(now);
+        int accent = t.hasShard ? shardColor(t.isRed) : C_DIM;
+
+        content.addView(section("碎片 · 今天"));
+
+        LinearLayout hero = new LinearLayout(this);
+        hero.setOrientation(LinearLayout.VERTICAL);
+        hero.setPadding(dp(16), dp(14), dp(16), dp(16));
+        GradientDrawable hg = round(C_CARD2, 16);
+        hg.setStroke(dp(1), 0x332C5A78);
+        hero.setBackground(hg);
+        content.addView(hero);
+
+        TextView badge = tv(t.hasShard ? (t.isRed ? "红石" : "黑石") : "今天无碎片", 26,
+                t.hasShard ? 0xFF12161F : C_DIM, true);
+        badge.setGravity(Gravity.CENTER);
+        badge.setPadding(dp(10), dp(12), dp(10), dp(12));
+        badge.setBackground(round(accent, 14));
+        hero.addView(badge, lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        String dateLine = String.format("%02d-%02d 周%s",
+                now.get(Calendar.MONTH) + 1, now.get(Calendar.DAY_OF_MONTH),
+                SHARD_WD[t.isoWeekday - 1]);
+        TextView sub = tv(dateLine + (t.hasShard ? " · " + t.place : " · " + t.reason), 14, C_TEXT, false);
+        sub.setPadding(0, dp(12), 0, 0);
+        hero.addView(sub);
+
+        if (t.hasShard) {
+            int nowMin = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE);
+            for (int[] w : t.times) {
+                int s1 = w[0] * 60 + w[1];
+                int e1 = w[2] == 24 ? 24 * 60 : w[2] * 60 + w[3];
+                String stat;
+                int col;
+                if (nowMin < s1) {
+                    stat = "未开始 · " + (s1 - nowMin) + " 分钟后";
+                    col = C_DIM;
+                } else if (nowMin >= e1) {
+                    stat = "已结束";
+                    col = C_DIM;
+                } else {
+                    stat = "进行中 · 剩 " + (e1 - nowMin) + " 分钟";
+                    col = accent;
+                }
+                LinearLayout row = new LinearLayout(this);
+                row.setOrientation(LinearLayout.HORIZONTAL);
+                row.setPadding(0, dp(10), 0, 0);
+                row.addView(tv(shardWin(w), 15, col == accent ? accent : C_TEXT, true),
+                        new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+                TextView st = tv(stat, 12, col, false);
+                st.setGravity(Gravity.END);
+                row.addView(st);
+                hero.addView(row);
+            }
+            if (t.isRed) {
+                TextView rw = tv("升华蜡烛 ×" + trimNum(t.reward) + "（烧红石）", 12, C_GOLD, false);
+                rw.setPadding(0, dp(10), 0, 0);
+                hero.addView(rw);
+            }
+        } else {
+            ShardDay nx = nextShard(now, 21);
+            if (nx != null) {
+                String line = "最近一次：" + nx.daysAhead + " 天后（" + (nx.isRed ? "红石" : "黑石")
+                        + " · " + nx.place + "）" + String.format("%02d:%02d", nx.times[0][0], nx.times[0][1]) + " 开始";
+                TextView nv = tv(line, 13, shardColor(nx.isRed), false);
+                nv.setPadding(0, dp(12), 0, 0);
+                hero.addView(nv);
+            }
+        }
+
+        content.addView(section("未来 7 天"));
+        for (int i = 0; i < 7; i++) {
+            Calendar c = (Calendar) now.clone();
+            c.add(Calendar.DAY_OF_MONTH, i);
+            ShardDay d = shardDay(c);
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setPadding(dp(12), dp(10), dp(12), dp(10));
+            row.setBackground(round(C_CARD2, 12));
+            LinearLayout.LayoutParams rlp = lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            rlp.topMargin = dp(6);
+            row.setLayoutParams(rlp);
+
+            row.addView(tv(d.hasShard ? "●" : "○", 14,
+                    d.hasShard ? shardColor(d.isRed) : C_DIM, false));
+            String label = String.format("%02d-%02d 周%s",
+                    c.get(Calendar.MONTH) + 1, c.get(Calendar.DAY_OF_MONTH),
+                    SHARD_WD[d.isoWeekday - 1]);
+            String body = label + "  " + (d.hasShard
+                    ? ((d.isRed ? "红石" : "黑石") + " · " + d.place) : "无碎片");
+            TextView info = tv(body, 13, d.hasShard ? C_TEXT : C_DIM, false);
+            info.setPadding(dp(8), 0, 0, 0);
+            row.addView(info, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+            if (d.hasShard) {
+                row.addView(tv(String.format("%02d:%02d", d.times[0][0], d.times[0][1]), 12, C_DIM, false));
+            }
+            content.addView(row);
+        }
+        content.addView(hint("社区算法（非官方）：周一/周四固定无碎片；1–15 号另停周三/周五，16 号后另停周二/周六。"
+                + "红石给升华蜡烛（2 / 2.5 / 3.5），黑石只给白蜡烛。最终以游戏内公告为准。"));
+    }
+
+    private String shardText() {
+        Calendar now = Calendar.getInstance();
+        StringBuilder sb = new StringBuilder("【光·遇】碎片日程（国服）\n");
+        for (int i = 0; i < 7; i++) {
+            Calendar c = (Calendar) now.clone();
+            c.add(Calendar.DAY_OF_MONTH, i);
+            ShardDay d = shardDay(c);
+            String label = String.format("%02d-%02d 周%s",
+                    c.get(Calendar.MONTH) + 1, c.get(Calendar.DAY_OF_MONTH),
+                    SHARD_WD[d.isoWeekday - 1]);
+            if (!d.hasShard) {
+                sb.append(label).append(" 无碎片（").append(d.reason).append("）\n");
+                continue;
+            }
+            sb.append(label).append(' ').append(d.isRed ? "红石" : "黑石").append(" · ").append(d.place);
+            if (d.isRed) sb.append(" ｜ 升华×").append(trimNum(d.reward));
+            sb.append('\n');
+            for (int[] w : d.times) sb.append("  ").append(shardWin(w)).append('\n');
+        }
+        sb.append("说明 社区算法（非官方），红石有升华蜡烛、黑石没有；以游戏内公告为准");
+        return sb.toString();
+    }
+
     private void renderSettings() {        final SharedPreferences sp = pref(this);
 
         content.addView(section("官方动态源"));
@@ -1630,7 +1910,39 @@ public class MainActivity extends Activity {
             content.addView(fe);
         }
 
-        content.addView(section("检测频率"));
+                content.addView(section("每日任务提醒"));
+        boolean dOn = sp.getBoolean("daily_remind", false);
+        TextView dbtn = bigBtn(dOn ? "每日任务提醒：已开启" : "每日任务提醒：已关闭", dOn ? C_ACCENT : C_DIM);
+        dbtn.setOnClickListener(v -> {
+            boolean now = !pref(MainActivity.this).getBoolean("daily_remind", false);
+            pref(MainActivity.this).edit().putBoolean("daily_remind", now).apply();
+            toast(now ? "每天到点会提醒你做每日任务" : "已关闭每日任务提醒");
+            render();
+        });
+        content.addView(dbtn);
+        EditText dt = new EditText(this);
+        dt.setHint("提醒时间，例如 08:00");
+        dt.setText(sp.getString("daily_time", "08:00"));
+        dt.setTextSize(13);
+        dt.setTextColor(C_TEXT);
+        dt.setHintTextColor(C_DIM);
+        dt.setSingleLine(true);
+        dt.setInputType(InputType.TYPE_CLASS_DATETIME);
+        dt.setBackground(round(C_CARD2, 10));
+        dt.setPadding(dp(10), dp(6), dp(10), dp(6));
+        content.addView(dt);
+        TextView dsave = bigBtn("保存提醒时间", C_ACCENT);
+        dsave.setOnClickListener(v -> {
+            pref(MainActivity.this).edit().putString("daily_time", dt.getText().toString().trim()).apply();
+            toast("已保存：" + dt.getText().toString().trim() + " 提醒");
+            render();
+        });
+        content.addView(dsave);
+        TextView dnote = tv("到点后通知栏提醒，当天只提醒一次；受系统省电策略影响，建议同时开启「常驻监控」。", 11, C_DIM, false);
+        dnote.setPadding(0, dp(6), 0, dp(6));
+        content.addView(dnote);
+
+content.addView(section("检测频率"));
         String[] names = {"15 分钟", "30 分钟", "60 分钟", "120 分钟"};
         int[] vals = {15, 30, 60, 120};
         int cur = sp.getInt("interval", 15);
@@ -1695,6 +2007,18 @@ public class MainActivity extends Activity {
             render();
         });
         content.addView(ff);
+
+        content.addView(section("动态页"));
+        boolean autoExp = sp.getBoolean("auto_expand", true);
+        TextView ae = bigBtn(autoExp ? "● 长文自动展开：开（默认整篇显示）" : "○ 长文自动展开：关（先显示摘要）",
+                autoExp ? 0xFF7BE3A5 : C_TEXT);
+        ae.setOnClickListener(x -> {
+            boolean now = pref(MainActivity.this).getBoolean("auto_expand", true);
+            pref(MainActivity.this).edit().putBoolean("auto_expand", !now).apply();
+            toast(now ? "已关闭：长动态先折叠，点「展开全文」再看" : "已开启：长动态默认整篇展开");
+            render();
+        });
+        content.addView(ae);
 
         content.addView(section("变更取证（自动存档）"));
         boolean cap = sp.getBoolean("capture", true);
@@ -1829,7 +2153,7 @@ public class MainActivity extends Activity {
         }
 
         content.addView(section("关于"));
-        content.addView(tv("SkyNews（光遇公告阅读器）v2.8 (10)", 13, C_TEXT, true));
+        content.addView(tv("SkyNews（光遇公告阅读器）v2.9 (11)", 13, C_TEXT, true));
         content.addView(tv("数据源：官方公告/新闻、TapTap、B站、云中继；抓取失败会保留旧条目（灰显）", 11, C_DIM, false));
         content.addView(tv("构建：无 Gradle（javac + aapt2 + d8 + apksigner）", 11, C_DIM, false));
 
@@ -1902,6 +2226,7 @@ public class MainActivity extends Activity {
     // ------------------------------------------------------------ 抓取
 
     private void refresh(final boolean manual) {
+        maybeDailyReminder(this);
         if (busy) {
             if (manual) toast("正在抓取…");
             return;
@@ -2175,6 +2500,9 @@ public class MainActivity extends Activity {
         NotificationChannel f = new NotificationChannel(CH_FEED, "官方动态", NotificationManager.IMPORTANCE_DEFAULT);
         f.setDescription("官方账号（B 站 / 官网）有新动态时提醒");
         nm.createNotificationChannel(f);
+        NotificationChannel dch = new NotificationChannel(CH_DAILY, "每日任务", NotificationManager.IMPORTANCE_DEFAULT);
+        dch.setDescription("每天到点提醒做光遇每日任务");
+        nm.createNotificationChannel(dch);
     }
 
     static PendingIntent pi(Context c) {
@@ -2206,6 +2534,47 @@ public class MainActivity extends Activity {
         nm.notify(NID_ANN, n);
     }
 
+    /** 每日任务提醒：到设定时间后当天只提醒一次（随 App 抓取/刷新时检查）。 */
+    static void maybeDailyReminder(Context c) {
+        try {
+            SharedPreferences sp = pref(c);
+            if (!sp.getBoolean("daily_remind", false)) return;
+            String hm = sp.getString("daily_time", "08:00");
+            int target = 8 * 60;
+            try {
+                String[] a = hm.split(":");
+                target = Integer.parseInt(a[0].trim()) * 60 + Integer.parseInt(a[1].trim());
+                if (target < 0 || target > 1439) target = 8 * 60;
+            } catch (Throwable ignore) {
+            }
+            java.util.Calendar cal = java.util.Calendar.getInstance();
+            int now = cal.get(java.util.Calendar.HOUR_OF_DAY) * 60 + cal.get(java.util.Calendar.MINUTE);
+            if (now < target) return;
+            String today = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.CHINA)
+                    .format(new java.util.Date());
+            if (today.equals(sp.getString("daily_last", ""))) return;
+            // 尊重免打扰/关键词过滤：被拦时不标记，等下次再提醒
+            if (!notifyAllowed(c, "每日任务")) return;
+            sp.edit().putString("daily_last", today).apply();
+            NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
+            if (nm == null) return;
+            android.content.Intent it = new android.content.Intent(c, MainActivity.class);
+            it.setFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK | android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            android.app.PendingIntent pi2 = android.app.PendingIntent.getActivity(c, 2004, it,
+                    android.app.PendingIntent.FLAG_UPDATE_CURRENT | android.app.PendingIntent.FLAG_IMMUTABLE);
+            Notification n = new Notification.Builder(c, CH_DAILY)
+                    .setSmallIcon(android.R.drawable.ic_dialog_info)
+                    .setContentTitle("光遇 · 每日任务")
+                    .setContentText("今天的每日任务刷新啦，记得上线做～")
+                    .setStyle(new Notification.BigTextStyle().bigText("今天的每日任务刷新啦，记得上线做～\n（4 个每日任务 + 大蜡烛，点开 App 查看资料/活动）"))
+                    .setAutoCancel(true)
+                    .setContentIntent(pi2)
+                    .build();
+            nm.notify(NID_DAILY, n);
+        } catch (Throwable ignore) {
+        }
+    }
+
     // ------------------------------------------------------------ 定时
 
     static void schedule(Context c) {
@@ -2222,6 +2591,7 @@ public class MainActivity extends Activity {
         @Override
         public boolean onStartJob(final JobParameters p) {
             new Thread(() -> {
+                    maybeDailyReminder(getApplicationContext());
                 try {
                     if (!online(getApplicationContext())) { jobFinished(p, false); return; }
                     String ann = http(U_ANN);
@@ -2265,6 +2635,7 @@ public class MainActivity extends Activity {
         public void onCreate() {
             super.onCreate();
             ensureChannel(this);
+        requestNotifPermission(this);
             Notification n = new Notification.Builder(this, CH_MON)
                     .setSmallIcon(android.R.drawable.stat_notify_sync)
                     .setContentTitle("光遇公告监控运行中")
@@ -2284,6 +2655,7 @@ public class MainActivity extends Activity {
             if (worker == null) {
                 worker = new Thread(() -> {
                     while (run) {
+                        try { maybeDailyReminder(getApplicationContext()); } catch (Throwable ignore) {}
                         try {
                             if (!online(getApplicationContext())) {
                                 try { Thread.sleep(60_000L); } catch (InterruptedException e) { break; }
