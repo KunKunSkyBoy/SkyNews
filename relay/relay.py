@@ -67,6 +67,7 @@ MIXIN = [46, 47, 18, 2, 53, 8, 23, 32, 15, 50, 10, 31, 58, 3, 45, 35, 27, 43,
          6, 63, 57, 62, 11, 36, 20, 34, 44, 52]
 
 SOURCE_LABEL = {"official": "官网", "taptap": "TapTap", "taptap_hot": "TapTap热帖",
+    "daily": "每日任务",
                 "bili": "B站", "weibo": "微博", "douyin": "抖音", "xhs": "小红书"}
 
 
@@ -438,6 +439,64 @@ def enrich_full_text(items, cfg):
         list(ex.map(work, targets[:max_n]))
     return items
 
+
+def _collect_daily_strings(obj, out, depth=0):
+    """从接口返回 JSON 里递归提取任务描述文本（容错：不同接口字段不一样）。"""
+    if depth > 8 or len(out) > 40:
+        return
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            _collect_daily_strings(v, out, depth + 1)
+    elif isinstance(obj, list):
+        for v in obj:
+            _collect_daily_strings(v, out, depth + 1)
+    elif isinstance(obj, str):
+        t = obj.strip()
+        if 4 <= len(t) <= 120 and not t.startswith("http") and t not in out:
+            out.append(t)
+
+
+def src_daily():
+    """光遇每日任务（独角兽API，需要免费密钥 SKYNEWS_DAILY_KEY）。"""
+    key = (os.environ.get("SKYNEWS_DAILY_KEY") or os.environ.get("UNICORN_KEY") or "").strip()
+    if not key:
+        raise NotConfigured("未配置 SKYNEWS_DAILY_KEY（独角兽API 免费密钥）")
+    out = []
+    try:
+        d1 = http_get_json("https://ovoav.com/api/sky/rwwz/rw1?key=" + urllib.parse.quote(key),
+                           referer="https://www.ovoav.com/doc/67")
+        if int(d1.get("code") or 0) == 200:
+            _collect_daily_strings(d1.get("data"), out)
+    except Exception:  # noqa: BLE001
+        pass
+    if not out:
+        try:
+            d1 = http_get_json("https://ovoav.com/api/sky/rwwz/rw?key=" + urllib.parse.quote(key),
+                               referer="https://www.ovoav.com/doc/6")
+            if int(d1.get("code") or 0) == 200:
+                _collect_daily_strings(d1.get("data"), out)
+        except Exception:  # noqa: BLE001
+            pass
+    # 大蜡烛位置
+    candle = ""
+    try:
+        d2 = http_get_json("https://ovoav.com/api/sky/rwby/dl?key=" + urllib.parse.quote(key),
+                           referer="https://www.ovoav.com/doc/95")
+        if int(d2.get("code") or 0) == 200:
+            tmp = []
+            _collect_daily_strings(d2.get("data"), tmp)
+            candle = " · ".join(tmp[:4])
+    except Exception:  # noqa: BLE001
+        pass
+    if not out:
+        raise RuntimeError("每日任务接口返回为空（密钥可能无效/过期）")
+    body = "\n".join(out[:8])
+    if candle:
+        body += "\n大蜡烛：" + candle
+    d = datetime.now(timezone.utc).strftime("%m月%d日")
+    return [make_item("daily-" + datetime.now(timezone.utc).strftime("%Y%m%d"), "daily",
+                      d + " 每日任务", "https://www.ovoav.com/doc/67", None, body)]
+
 def src_weibo():
     cookie = (os.environ.get("WEIBO_COOKIE") or "").strip()
     base = (os.environ.get("RSSHUB_BASE") or "").rstrip("/")
@@ -589,6 +648,7 @@ def build_sources():
              "xhs": "xhs", "小红书": "xhs", "taptap": "taptap", "taptap_hot": "taptap_hot"}
     wanted = [alias.get(x, x) for x in wanted]
     table = {
+        "daily": src_daily,
         "official": src_official,
         "taptap": src_taptap,
         "taptap_hot": src_taptap_hot,
