@@ -99,8 +99,8 @@ public class MainActivity extends Activity {
     static final String CH_DAILY = "sky_daily_channel";
     static final int NID_FEED = 1003;
     static final int NID_DAILY = 1004;
-    static final int NID_SHARD = 1005;
-    static final String CH_SHARD = "sky_shard_channel";
+    static final int NID_SHARD = 1007;
+    static final String CH_SHARD = "sky_shard_channel2";
     static final String ACTION_SHARD = "com.dsh.skynews.SHARD_ALARM";
     static final String CH_ANN = "sky_ann_channel";
     static final String CH_MON = "sky_mon_channel";
@@ -175,6 +175,11 @@ public class MainActivity extends Activity {
         getWindow().setStatusBarColor(C_BG);
         getWindow().setNavigationBarColor(C_BG);
         ensureChannel(this);
+        try {   // 清掉调试期留下的 A/B 通知
+            NotificationManager nm0 = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+            if (nm0 != null) nm0.cancel(1006);
+        } catch (Throwable ignore) {
+        }
         requestNotifPermission(this);
         buildUi();
         render();
@@ -2190,7 +2195,7 @@ content.addView(section("检测频率"));
         }
 
         content.addView(section("关于"));
-        content.addView(tv("SkyNews（光遇公告阅读器）v3.1 (13)", 13, C_TEXT, true));
+        content.addView(tv("SkyNews（光遇公告阅读器）v3.2 (14)", 13, C_TEXT, true));
         content.addView(tv("数据源：官方公告/新闻、TapTap、B站、云中继；抓取失败会保留旧条目（灰显）", 11, C_DIM, false));
         content.addView(tv("构建：无 Gradle（javac + aapt2 + d8 + apksigner）", 11, C_DIM, false));
 
@@ -2543,6 +2548,10 @@ content.addView(section("检测频率"));
         NotificationChannel sch = new NotificationChannel(CH_SHARD, "碎片提醒", NotificationManager.IMPORTANCE_HIGH);
         sch.setDescription("红石 / 黑石开始前 10 分钟提醒");
         nm.createNotificationChannel(sch);
+        try {   // 早期版本用过的废渠道（通知 id 1005 在该渠道下会被系统丢弃）
+            nm.deleteNotificationChannel("sky_shard_channel");
+        } catch (Throwable ignore) {
+        }
     }
 
     static PendingIntent pi(Context c) {
@@ -3067,6 +3076,7 @@ content.addView(section("检测频率"));
             case "douyin": return "抖音";
             case "xhs": return "小红书";
             case "daily": return "每日任务";
+            case "extra": return "速览";
             default: return key;
         }
     }
