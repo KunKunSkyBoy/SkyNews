@@ -822,7 +822,7 @@ public class MainActivity extends Activity {
             LinearLayout head = new LinearLayout(this);
             head.setOrientation(LinearLayout.HORIZONTAL);
             head.setGravity(Gravity.CENTER_VERTICAL);
-            head.addView(chip(o.optString("src", "官方")));
+            head.addView(chip(relaySrcLabel(o.optString("src", "官方"))));
             LinearLayout.LayoutParams tlp2 = lp(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
             tlp2.leftMargin = dp(8);
             head.addView(tv(o.optString("t", ""), 11, C_DIM, false), tlp2);
