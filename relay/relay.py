@@ -192,6 +192,10 @@ def http_get(url, referer=None, cookie=None, timeout=DEFAULT_TIMEOUT,
         return raw.decode("gbk", "replace")
 
 
+class NotConfigured(RuntimeError):
+    """未配置（不需要重试）：跳过该源，直接记 error。"""
+
+
 class Http412(RuntimeError):
     pass
 
@@ -238,7 +242,7 @@ def src_taptap_hot():
     route = (os.environ.get("SKYNEWS_TAPTAP_HOT_ROUTE") or "").strip()
     base = (os.environ.get("RSSHUB_BASE") or "").rstrip("/")
     if not (base and route):
-        raise RuntimeError("未配置 RSSHUB_BASE / SKYNEWS_TAPTAP_HOT_ROUTE")
+        raise NotConfigured("未配置 RSSHUB_BASE / SKYNEWS_TAPTAP_HOT_ROUTE")
     return fetch_rss(base + route, "taptap_hot", referer=base + "/")
 
 
@@ -351,7 +355,7 @@ def src_weibo():
     try:
         return _weibo_web_pages()
     except Exception as e:  # noqa: BLE001
-        raise RuntimeError("未配置 WEIBO_COOKIE/RSSHUB_BASE，公开时间线不可用（%s）" % e)
+        raise NotConfigured("未配置 WEIBO_COOKIE/RSSHUB_BASE，公开时间线不可用（%s）" % e)
 
 
 def parse_weibo_time(s):
@@ -373,7 +377,7 @@ def src_douyin():
     base = (os.environ.get("RSSHUB_BASE") or "").rstrip("/")
     route = (os.environ.get("SKYNEWS_DOUYIN_ROUTE") or "").strip()
     if not (base and route):
-        raise RuntimeError("未配置 RSSHUB_BASE / SKYNEWS_DOUYIN_ROUTE")
+        raise NotConfigured("未配置 RSSHUB_BASE / SKYNEWS_DOUYIN_ROUTE")
     return fetch_rss(base + route, "douyin", referer=base + "/")
 
 
@@ -381,7 +385,7 @@ def src_xhs():
     base = (os.environ.get("RSSHUB_BASE") or "").rstrip("/")
     route = (os.environ.get("SKYNEWS_XHS_ROUTE") or "").strip()
     if not (base and route):
-        raise RuntimeError("未配置 RSSHUB_BASE / SKYNEWS_XHS_ROUTE")
+        raise NotConfigured("未配置 RSSHUB_BASE / SKYNEWS_XHS_ROUTE")
     return fetch_rss(base + route, "xhs", referer=base + "/")
 
 
@@ -399,7 +403,7 @@ def _bili_sign(params, img_key, sub_key):
 def src_bili():
     # GitHub Actions 海外出口经常 412：默认跳过，除非 SKYNEWS_BILI_CI=1
     if os.environ.get("GITHUB_ACTIONS") == "true" and not env_bool("SKYNEWS_BILI_CI"):
-        raise RuntimeError("CI 跳过 B 站（海外 IP 412 风控）；App 本地抓，或设 SKYNEWS_BILI_CI=1 强制")
+        raise NotConfigured("CI 跳过 B 站（海外 IP 412 风控）；App 本地抓，或设 SKYNEWS_BILI_CI=1 强制")
     last_err = None
     for attempt in range(3):
         try:
@@ -540,6 +544,9 @@ def run_source(name, fn, cfg, prev_items, prev_meta):
             items = [it for it in got if it.get("id")]
             if not items:
                 raise RuntimeError("返回 0 条（源可能被风控/空数据）")
+            break
+        except NotConfigured as e:
+            errors.append("%s: %s" % (type(e).__name__, str(e)[:180]))
             break
         except Exception as e:  # noqa: BLE001
             errors.append("%s: %s" % (type(e).__name__, str(e)[:180]))
