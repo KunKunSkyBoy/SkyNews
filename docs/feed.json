@@ -1,20 +1,13 @@
 {
  "schema": 2,
- "generated_at": "2026-11-11T18:27:56Z",
- "updated": "2026-11-11T18:27:56Z",
- "count": 53,
+ "generated_at": "2026-11-11T18:35:32Z",
+ "updated": "2026-11-11T18:35:32Z",
+ "count": 54,
  "sources": {
-  "xhs": {
+  "douyin": {
    "ok": false,
    "count": 0,
-   "error": "NotConfigured: 未配置 RSSHUB_BASE / SKYNEWS_XHS_ROUTE",
-   "elapsed_ms": 0,
-   "last_success": null
-  },
-  "daily": {
-   "ok": false,
-   "count": 0,
-   "error": "NotConfigured: 未配置 SKYNEWS_DAILY_KEY（独角兽API 免费密钥）",
+   "error": "NotConfigured: 未配置 RSSHUB_BASE / SKYNEWS_DOUYIN_ROUTE",
    "elapsed_ms": 0,
    "last_success": null
   },
@@ -26,43 +19,61 @@
    "last_success": "2026-11-11T16:36:31Z",
    "stale": true
   },
-  "douyin": {
+  "xhs": {
    "ok": false,
    "count": 0,
-   "error": "NotConfigured: 未配置 RSSHUB_BASE / SKYNEWS_DOUYIN_ROUTE",
+   "error": "NotConfigured: 未配置 RSSHUB_BASE / SKYNEWS_XHS_ROUTE",
    "elapsed_ms": 0,
    "last_success": null
+  },
+  "daily": {
+   "ok": true,
+   "count": 1,
+   "error": null,
+   "elapsed_ms": 412,
+   "last_success": "2026-11-11T18:35:17Z"
   },
   "official": {
    "ok": true,
    "count": 30,
    "error": null,
-   "elapsed_ms": 1297,
-   "last_success": "2026-11-11T18:27:37Z"
+   "elapsed_ms": 874,
+   "last_success": "2026-11-11T18:35:18Z"
   },
   "taptap": {
    "ok": true,
    "count": 10,
    "error": null,
-   "elapsed_ms": 1555,
-   "last_success": "2026-11-11T18:27:38Z"
+   "elapsed_ms": 1286,
+   "last_success": "2026-11-11T18:35:18Z"
   },
   "weibo": {
    "ok": false,
    "count": 0,
    "error": "NotConfigured: 未配置 WEIBO_COOKIE/RSSHUB_BASE，公开时间线不可用（公开时间线不可用：JSON 解析失败: Expecting value: line 1 column 1 (char 0)）",
-   "elapsed_ms": 11836,
+   "elapsed_ms": 9567,
    "last_success": null
   }
  },
  "problems": [
   "B站: NotConfigured: CI 跳过 B 站（海外 IP 412 风控）；App 本地抓，或设 SKYNEWS_BILI_CI=1 强制",
-  "每日任务: NotConfigured: 未配置 SKYNEWS_DAILY_KEY（独角兽API 免费密钥）",
   "抖音: NotConfigured: 未配置 RSSHUB_BASE / SKYNEWS_DOUYIN_ROUTE",
   "微博: NotConfigured: 未配置 WEIBO_COOKIE/RSSHUB_BASE，公开时间线不可用（公开时间线不可用：JSON 解析失败: Expecting value: line 1 column 1 (char 0)）",
   "小红书: NotConfigured: 未配置 RSSHUB_BASE / SKYNEWS_XHS_ROUTE"
  ],
  "items": [
+  {
+   "id": "daily-20261112",
+   "source": "daily",
+   "title": "11月12日 每日任务",
+   "url": "https://skydaily.nankki.com/",
+   "time": "2026-11-12T00:00:00Z",
+   "summary": "今日每日任务： 1. 拾起一只螃蟹 2. 向一位玩家鞠躬 3. 在水母上回复能量 4. 向一位朋友招手 每日大蜡烛位置：在遇境/云巢里传送门门口处，若有两根小蜡烛在两边，即表示对应的地图里会有大蜡烛堆~",
+   "src": "每日任务",
+   "ts": 1794441600,
+   "t": "11-12 00:00",
+   "text": "11月12日 每日任务\n今日每日任务： 1. 拾起一只螃蟹 2. 向一位玩家鞠躬 3. 在水母上回复能量 4. 向一位朋友招手 每日大蜡烛位置：在遇境/云巢里传送门门口处，若有两根小蜡烛在两边，即表示对应的地图里会有大蜡烛堆~"
+  },
   {
    "id": "tt-869698228495322834",
    "source": "taptap",
