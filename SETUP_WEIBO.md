@@ -55,3 +55,21 @@ powershell -ExecutionPolicy Bypass -File tools\set_weibo_cookie.ps1 -Cookie "粘
 那两个平台需要「自建 RSSHub + 平台 Cookie + 账号路由」，小白不建议折腾；目前 App 已覆盖：官网 / TapTap / B站（本地抓）/ 公告，够用。
 
 如果以后想加，配置写在 [`relay/SOURCES.md`](../relay/SOURCES.md)。
+
+---
+
+## 更简单的方式（推荐）：全自动脚本
+
+不想按 F12？运行这一条，脚本会**打开一个独立 Edge 窗口**：
+
+```powershell
+cd "E:\gongzuoqu\SkyNews\SkyNews-20261111(1)\SkyNews"
+$env:SKYNEWS_GH_TOKEN="你的GitHub令牌"
+powershell -ExecutionPolicy Bypass -File tools\get_weibo_cookie_auto.ps1
+```
+
+1. 在弹出的窗口里登录微博（扫码/账号密码都行）；
+2. 回到黑窗口按 **Enter**；
+3. 脚本自动提取 Cookie → 加密写入 Secret → 触发抓取 → 打印结果。
+
+> 不会动你平时用的浏览器（独立临时配置，用完即关、自动清理）。
