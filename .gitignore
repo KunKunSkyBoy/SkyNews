@@ -23,3 +23,6 @@ __pycache__/
 # relay 本地自检/输出产物
 relay/_verify/
 relay/docs/
+
+# 本地工具 key（不提交）
+relay/.t1qq.key
