@@ -278,8 +278,8 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams tlp = lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         tlp.topMargin = dp(14);
         root.addView(tabRow, tlp);
-        String[] names = {"公告", "动态", "变更历史", "设置", "预载", "日历", "碎片", "资料"};
-        String[] icons = {"ann", "feed", "hist", "set", "pre", "cal", "shard", "age"};
+        String[] names = {"公告", "动态", "变更历史", "设置", "预载", "日历", "碎片", "资料", "工具"};
+        String[] icons = {"ann", "feed", "hist", "set", "pre", "cal", "shard", "age", "tool"};
         for (int i = 0; i < names.length; i++) {
             final int idx = i;
             TextView t = tv(names[i], 12, C_DIM, true);
@@ -415,6 +415,7 @@ public class MainActivity extends Activity {
 
     private void render() {
         if (copyBtn != null) {
+            copyBtn.setVisibility(tab == 8 ? View.GONE : View.VISIBLE);
             String label = tab == 6 ? "复制石头" : tab == 5 ? "复制日历" : tab == 4 ? "复制预载" : tab == 1 ? "复制动态" : tab == 0 ? "复制全文" : "复制";
             copyBtn.setText(label);
         }
@@ -440,6 +441,7 @@ public class MainActivity extends Activity {
         else if (tab == 5) renderCalendar();
         else if (tab == 6) renderShard();
         else if (tab == 7) renderSky();
+        else if (tab == 8) renderTools();
         else renderSettings();
         updateStatus();
         animateIn();
@@ -493,6 +495,55 @@ public class MainActivity extends Activity {
             box.addView(t2);
         }
         content.addView(box, bp);
+    }
+
+
+
+    private static final String U_TOOLS = "https://kunkunskyboy.github.io/SkyNews/tools.html";
+
+    /** 工具页：所有免费光遇工具的独立按钮（点开是内置 WebView，支持图片）。 */
+    private void renderTools() {
+        content.addView(section("光遇工具（免费数据源）"));
+        TextView tip = tv("全部来自免费公开接口（skydaily / 应天API），每日自动更新；点按钮在 App 内打开，支持图片。", 12, C_DIM, false);
+        tip.setPadding(0, dp(4), 0, dp(10));
+        content.addView(tip);
+        String[][] tools = {
+                {"每日任务", "daily"}, {"今日速览", "extra"},
+                {"红石天气", "gytq"}, {"季节蜡烛图", "scjl"},
+                {"大蜡烛图", "scdl"}, {"复刻先祖", "scfk"},
+                {"活动日历", "hdrl"}, {"每日任务位置图", "scrw"},
+                {"季节倒计时", "djs"}
+        };
+        LinearLayout row = null;
+        for (int i = 0; i < tools.length; i++) {
+            if (i % 2 == 0) {
+                row = new LinearLayout(this);
+                row.setOrientation(LinearLayout.HORIZONTAL);
+                LinearLayout.LayoutParams rl = new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                rl.topMargin = dp(8);
+                content.addView(row, rl);
+            }
+            final String url = U_TOOLS + "#" + tools[i][1];
+            TextView b = bigBtn(tools[i][0], C_ACCENT);
+            b.setOnClickListener(v -> {
+                Intent it = new Intent(MainActivity.this, ReaderActivity.class);
+                it.putExtra("content", "");
+                it.putExtra("url", url);
+                startActivity(it);
+            });
+            LinearLayout.LayoutParams bl = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+            if (i % 2 == 1) bl.leftMargin = dp(8);
+            row.addView(b, bl);
+        }
+        TextView openAll = bigBtn("打开完整工具页", C_ACCENT);
+        openAll.setOnClickListener(v -> {
+            Intent it = new Intent(MainActivity.this, ReaderActivity.class);
+            it.putExtra("content", "");
+            it.putExtra("url", U_TOOLS);
+            startActivity(it);
+        });
+        content.addView(openAll);
     }
 
     private void renderSky() {
@@ -2195,7 +2246,7 @@ content.addView(section("检测频率"));
         }
 
         content.addView(section("关于"));
-        content.addView(tv("SkyNews（光遇公告阅读器）v3.2 (14)", 13, C_TEXT, true));
+        content.addView(tv("SkyNews（光遇公告阅读器）v4.0 (15)", 13, C_TEXT, true));
         content.addView(tv("数据源：官方公告/新闻、TapTap、B站、云中继；抓取失败会保留旧条目（灰显）", 11, C_DIM, false));
         content.addView(tv("构建：无 Gradle（javac + aapt2 + d8 + apksigner）", 11, C_DIM, false));
 
