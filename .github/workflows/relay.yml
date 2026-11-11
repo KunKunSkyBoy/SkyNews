@@ -68,6 +68,7 @@ jobs:
       - name: 抓取并生成 feed（失败自动重试 3 轮）
         env:
           WEIBO_COOKIE: ${{ secrets.WEIBO_COOKIE }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SKYNEWS_DAILY_KEY: ${{ secrets.UNICORN_KEY }}
           SKYNEWS_T1QQ_KEY: ${{ secrets.T1QQ_KEY }}
           RSSHUB_BASE: ${{ github.event.inputs.rsshub || vars.RSSHUB_BASE }}
