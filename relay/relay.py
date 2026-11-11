@@ -476,6 +476,26 @@ def _daily_from_oivio():
     return date, body
 
 
+
+def _daily_from_t1qq():
+    """备用源：应天API 光遇每日任务（免费 key：SKYNEWS_T1QQ_KEY）。"""
+    key = (os.environ.get("SKYNEWS_T1QQ_KEY") or "").strip()
+    if not key:
+        raise NotConfigured("未配置 SKYNEWS_T1QQ_KEY（应天API 免费密钥）")
+    d = http_get_json("https://api.t1qq.com/api/sky/gyrw?key=" + urllib.parse.quote(key),
+                      referer="https://api.t1qq.com/")
+    rw = d.get("rw") or []
+    lines = []
+    for i, t in enumerate(rw[:8]):
+        txt = (t.get("text") or "").replace("#r", "").strip()
+        if txt:
+            lines.append("%d. %s" % (i + 1, txt))
+    if not lines:
+        raise RuntimeError("应天API 返回空任务")
+    date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    return date, "今日每日任务：\n" + "\n".join(lines)
+
+
 def src_daily():
     """光遇每日任务（主：skydaily.nankki.com 免费 API；备：oivio 公开 data.json）。"""
     date, body = "", ""
@@ -515,10 +535,18 @@ def src_daily():
             raise RuntimeError("skydaily 返回空任务")
     except Exception as e:  # noqa: BLE001
         last_err = e
+        date, body = "", ""
+        # 备用源 1：应天API（免费 key，已配置）
         try:
-            date, body = _daily_from_oivio()
-        except Exception as e2:  # noqa: BLE001
-            raise RuntimeError("每日任务主/备源均失败：%s / %s" % (last_err, e2))
+            date, body = _daily_from_t1qq()
+        except Exception as e1:  # noqa: BLE001
+            last_err = "%s / 应天:%s" % (last_err, e1)
+        # 备用源 2：oivio 公开 data.json
+        if not body:
+            try:
+                date, body = _daily_from_oivio()
+            except Exception as e2:  # noqa: BLE001
+                raise RuntimeError("每日任务主/备源均失败：%s / %s" % (last_err, e2))
 
     parts = date.split("-")
     label = ("%s月%s日" % (parts[1], parts[2])) if len(parts) == 3 else (date or "今日")
