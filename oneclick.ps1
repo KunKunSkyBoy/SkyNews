@@ -79,8 +79,19 @@ function Deploy-GitHub {
         $env:GIT_TERMINAL_PROMPT = '0'
         $url = "https://x-access-token:$token@github.com/$Repo.git"
         $clone = Join-Path $tmp 'repo'
-        git -c user.name='SkyNews Bot' -c user.email='bot@example.com' clone --depth 1 $url $clone 2>&1 | Out-Null
-        if ($LASTEXITCODE -ne 0) { throw 'clone failed（令牌无效或仓库不可访问）' }
+        # 直连 GitHub 在国内可能间歇失败：直连重试 3 次，仍失败则用 ghfast 镜像做「只读克隆」
+        $cloned = $false
+        for ($i = 1; $i -le 3; $i++) {
+            git -c user.name='SkyNews Bot' -c user.email='bot@example.com' clone --depth 1 $url $clone 2>$null | Out-Null
+            if ($LASTEXITCODE -eq 0) { $cloned = $true; break }
+            if (Test-Path $clone) { Remove-Item $clone -Recurse -Force -ErrorAction SilentlyContinue }
+            Start-Sleep -Seconds (2 * $i)
+        }
+        if (-not $cloned) {
+            Log '直连失败，改用 ghfast 镜像克隆（只读，推送仍走 GitHub）'
+            git -c user.name='SkyNews Bot' -c user.email='bot@example.com' clone --depth 1 "https://ghfast.top/https://github.com/$Repo.git" $clone 2>$null | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw 'clone failed（直连与镜像均失败）' }
+        }
 
         # 同步本地文件到仓库（保持仓库与本地一致）
         $items = @(
@@ -124,6 +135,12 @@ function Deploy-GitHub {
             $bd = Join-Path $clone $b
             if (Test-Path $bd) { Remove-Item $bd -Recurse -Force; Log "清理嵌套副本 $b" }
         }
+        # GitHub Pages 强制静态托管（跳过 Jekyll，避免 legacy Pages 构建报错）
+        $docsD = Join-Path $clone 'docs'
+        New-Item -ItemType Directory -Force $docsD | Out-Null
+        if (-not (Test-Path (Join-Path $docsD '.nojekyll'))) {
+            Set-Content -Path (Join-Path $docsD '.nojekyll') -Value '' -Encoding ascii
+        }
         # 发布产物
         $apk = Join-Path $ROOT 'skynews.apk'
         if (Test-Path $apk) { Copy-Item $apk (Join-Path $clone 'skynews.apk') -Force }
@@ -132,8 +149,16 @@ function Deploy-GitHub {
         git add -A
         $msg = 'chore: one-click sync ' + (Get-Date -Format 'yyyy-MM-dd HH:mm')
         git -c user.name='SkyNews Bot' -c user.email='bot@example.com' commit -m $msg 2>&1 | Out-Null
-        git push $url $Branch 2>&1 | Select-Object -Last 2
-        if ($LASTEXITCODE -ne 0) { throw 'push failed' }
+        # push 可能遇到 CI 刚提交的 feed（非快进）或网络抖动：rebase 后重试 4 次
+        $pushed = $false
+        for ($i = 1; $i -le 4; $i++) {
+            git push $url $Branch 2>&1 | Out-Null
+            if ($LASTEXITCODE -eq 0) { $pushed = $true; break }
+            Log "push 失败，pull --rebase 后重试 ($i/4)"
+            git pull --rebase --autostash $url $Branch 2>&1 | Out-Null
+            Start-Sleep -Seconds (2 * $i)
+        }
+        if (-not $pushed) { Pop-Location; throw 'push failed（重试 4 次仍失败）' }
         Pop-Location
         Log '已推送'
     } finally {
