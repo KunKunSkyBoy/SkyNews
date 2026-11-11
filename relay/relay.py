@@ -482,8 +482,7 @@ def src_daily():
                 body += "\n" + title + "：" + txt.split("\n")[0][:120]
     except Exception:  # noqa: BLE001
         pass
-    ts = int(datetime.strptime(date, "%Y-%m-%d").replace(
-        tzinfo=timezone.utc).timestamp()) if re.match(r"^\d{4}-\d{2}-\d{2}$", date) else None
+    ts = None  # 用当前时间，避免按未来日期排序跑到最前
     parts = date.split("-")
     label = ("%s月%s日" % (parts[1], parts[2])) if len(parts) == 3 else date
     return [make_item("daily-" + date.replace("-", ""), "daily",
