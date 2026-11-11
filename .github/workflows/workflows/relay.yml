@@ -7,11 +7,28 @@ name: skynews-relay
 #   * 只有 feed 内容真的变化才 commit，避免每 10 分钟一次空提交；
 #   * Actions 海外出口对 B 站常返回 412：默认跳过（SKYNEWS_BILI_CI=0），App 本地抓；
 #     想强制在 CI 抓 B 站，设仓库变量 SKYNEWS_BILI_CI=1。
+# 手动触发（workflow_dispatch）可临时覆盖：
+#   rsshub   = 临时 RSSHub 实例地址（如 https://rsshub.example.com），留空用仓库变量
+#   sources  = 源开关（如 tap,official,bili,weibo）
+#   bili_ci  = 1 强制在 CI 抓 B 站 / 0 跳过
 
 on:
   schedule:
     - cron: "*/10 * * * *"
   workflow_dispatch:
+    inputs:
+      rsshub:
+        description: "临时 RSSHub 实例（留空=仓库变量 RSSHUB_BASE）"
+        required: false
+        default: ""
+      sources:
+        description: "源开关（逗号分隔，留空=默认全部）"
+        required: false
+        default: ""
+      bili_ci:
+        description: "CI 抓 B 站（1=抓 / 0=跳过）"
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -23,9 +40,9 @@ concurrency:
 env:
   PYTHONUNBUFFERED: "1"
   # 源开关：tap=TapTap 官方帖、official=官网、bili=B站、weibo/douyin/xhs 见 relay/README.md
-  SKYNEWS_SOURCES: "tap,official,bili,weibo,douyin,xhs"
-  # CI 默认跳过 B 站（412）；要强制设为 1
-  SKYNEWS_BILI_CI: "0"
+  SKYNEWS_SOURCES: ${{ github.event.inputs.sources || 'tap,official,bili,weibo,douyin,xhs' }}
+  # CI 默认跳过 B 站（412）；手动触发可传 bili_ci=1
+  SKYNEWS_BILI_CI: ${{ github.event.inputs.bili_ci || '0' }}
   SKYNEWS_TIMEOUT: "8"
   SKYNEWS_RETRIES: "3"
   SKYNEWS_TOTAL_TIMEOUT: "60"
@@ -51,7 +68,7 @@ jobs:
       - name: 抓取并生成 feed（失败自动重试 3 轮）
         env:
           WEIBO_COOKIE: ${{ secrets.WEIBO_COOKIE }}
-          RSSHUB_BASE: ${{ vars.RSSHUB_BASE }}
+          RSSHUB_BASE: ${{ github.event.inputs.rsshub || vars.RSSHUB_BASE }}
         run: |
           set -e
           for i in 1 2 3; do
@@ -63,7 +80,7 @@ jobs:
             echo "抓取脚本异常，$((i*10))s 后重试"
             sleep $((i*10))
           done
-          echo "三种尝试均失败（脚本级异常）"; exit 1
+          echo "三次尝试均失败（脚本级异常）"; exit 1
 
       - name: 写入 workflow 摘要（各源健康状态）
         if: always()
