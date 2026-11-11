@@ -25,6 +25,12 @@ import android.content.pm.ServiceInfo;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
+import android.text.Editable;
+import android.text.TextWatcher;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -94,8 +100,36 @@ public class MainActivity extends Activity {
     static final int NID_MON = 1002;
     static final int JOB_ID = 0x5c01;
 
-    static final int C_BG = 0xFF0B1020, C_CARD = 0xFF151B2E, C_CARD2 = 0xFF1D2439,
-            C_ACCENT = 0xFF6FD3FF, C_GOLD = 0xFFF3C77B, C_TEXT = 0xFFE6ECF7, C_DIM = 0xFF8C97B3;
+    // 主题色（静态可切换：跟随/浅色/深色；改动后 recreate 生效）
+    static int C_BG = 0xFF0B1020, C_CARD = 0xFF151B2E, C_CARD2 = 0xFF1D2439,
+            C_ACCENT = 0xFF6FD3FF, C_GOLD = 0xFFF3C77B, C_TEXT = 0xFFE6ECF7, C_DIM = 0xFF8C97B3,
+            C_BODY = 0xFFCBD5E8;
+    static final int THEME_AUTO = 0, THEME_LIGHT = 1, THEME_DARK = 2;
+
+    static int themeMode(Context c) {
+        return pref(c).getInt("theme_mode", THEME_AUTO);
+    }
+
+    /** 应用主题色：跟随系统用 uiMode 判断；浅色/深色手动覆盖。 */
+    static void applyTheme(Context c) {
+        int mode = themeMode(c);
+        boolean dark;
+        if (mode == THEME_DARK) dark = true;
+        else if (mode == THEME_LIGHT) dark = false;
+        else {
+            int ui = c.getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK;
+            dark = ui == android.content.res.Configuration.UI_MODE_NIGHT_YES;
+        }
+        if (dark) {
+            C_BG = 0xFF0B1020; C_CARD = 0xFF151B2E; C_CARD2 = 0xFF1D2439;
+            C_ACCENT = 0xFF6FD3FF; C_GOLD = 0xFFF3C77B; C_TEXT = 0xFFE6ECF7; C_DIM = 0xFF8C97B3;
+            C_BODY = 0xFFCBD5E8;
+        } else {
+            C_BG = 0xFFF4F6FB; C_CARD = 0xFFFFFFFF; C_CARD2 = 0xFFE9EEF7;
+            C_ACCENT = 0xFF1E88E5; C_GOLD = 0xFFB07A10; C_TEXT = 0xFF1A2233; C_DIM = 0xFF6B7688;
+            C_BODY = 0xFF33405A;
+        }
+    }
 
     private LinearLayout tabRow, content;
     private TextView tvStatus, tvRefresh;
@@ -108,10 +142,19 @@ public class MainActivity extends Activity {
     private final ExecutorService pool = Executors.newSingleThreadExecutor();
     private final Handler ui = new Handler(Looper.getMainLooper());
     private boolean busy = false;
+    private EditText searchBar;
+    private String searchQuery = "";
+    private boolean favOnly = false;
+
+    // ---- 资料页（assets/sky 静态数据）----
+    private int skyCat = 0;
+    private final java.util.HashMap<String, JSONObject> skyCache = new java.util.HashMap<>();
+    private static final String[] SKY_CATS = {"物品", "先祖", "每日任务", "世界任务", "赛季", "活动"};
 
     @Override
     protected void onCreate(Bundle b) {
         super.onCreate(b);
+        applyTheme(this);
         getWindow().setStatusBarColor(C_BG);
         getWindow().setNavigationBarColor(C_BG);
         ensureChannel(this);
@@ -119,6 +162,21 @@ public class MainActivity extends Activity {
         render();
         refresh(false);
         schedule(this);
+        handleOpenIntent(getIntent());
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        handleOpenIntent(intent);
+    }
+
+    private void handleOpenIntent(Intent i) {
+        try {
+            String u = i == null ? "" : i.getStringExtra("open_url");
+            if (u != null && u.startsWith("http")) open(u);
+        } catch (Throwable ignore) {
+        }
     }
 
     @Override
@@ -189,8 +247,8 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams tlp = lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         tlp.topMargin = dp(14);
         root.addView(tabRow, tlp);
-        String[] names = {"公告", "动态", "变更历史", "设置", "预载", "日历"};
-        String[] icons = {"ann", "feed", "hist", "set", "pre", "cal"};
+        String[] names = {"公告", "动态", "变更历史", "设置", "预载", "日历", "资料"};
+        String[] icons = {"ann", "feed", "hist", "set", "pre", "cal", "age"};
         for (int i = 0; i < names.length; i++) {
             final int idx = i;
             TextView t = tv(names[i], 12, C_DIM, true);
@@ -208,6 +266,26 @@ public class MainActivity extends Activity {
             });
             tabRow.addView(t, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         }
+
+        searchBar = new EditText(this);
+        searchBar.setHint("搜索标题/正文/来源…");
+        searchBar.setTextSize(13);
+        searchBar.setTextColor(C_TEXT);
+        searchBar.setHintTextColor(C_DIM);
+        searchBar.setSingleLine(true);
+        searchBar.setBackground(round(C_CARD2, 10));
+        searchBar.setPadding(dp(10), dp(6), dp(10), dp(6));
+        searchBar.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) { }
+            @Override public void onTextChanged(CharSequence s, int a, int b, int c) { }
+            @Override public void afterTextChanged(Editable s) {
+                searchQuery = s.toString().trim();
+                render();
+            }
+        });
+        LinearLayout.LayoutParams sblp = lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        sblp.topMargin = dp(10);
+        root.addView(searchBar, sblp);
 
         scroller = new ScrollView(this);
         scroller.setFillViewport(true);
@@ -307,9 +385,12 @@ public class MainActivity extends Activity {
             try {
                 t.setCompoundDrawableTintList(ColorStateList.valueOf(on ? C_ACCENT : C_DIM));
             } catch (Throwable ignore) { }
-            GradientDrawable g = round(on ? 0xFF16283D : 0x00000000, 12);
+            GradientDrawable g = round(on ? C_CARD2 : 0x00000000, 12);
             if (on) g.setStroke(dp(1), 0xFF2C5A78);
             t.setBackground(g);
+        }
+        if (searchBar != null) {
+            searchBar.setVisibility(tab == 0 || tab == 1 || tab == 2 || tab == 6 ? View.VISIBLE : View.GONE);
         }
         content.removeAllViews();
         if (tab == 0) renderAnn();
@@ -317,9 +398,224 @@ public class MainActivity extends Activity {
         else if (tab == 2) renderHist();
         else if (tab == 4) renderPreload();
         else if (tab == 5) renderCalendar();
+        else if (tab == 6) renderSky();
         else renderSettings();
         updateStatus();
         animateIn();
+    }
+
+    // ------------------------------------------------------------ 资料页（assets/sky 静态数据）
+
+    private JSONObject skyObj(String name) throws Exception {
+        JSONObject cached = skyCache.get(name);
+        if (cached != null) return cached;
+        java.io.InputStream in = getAssets().open("sky/" + name + ".json");
+        java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream();
+        byte[] buf = new byte[8192];
+        int n;
+        while ((n = in.read(buf)) > 0) bo.write(buf, 0, n);
+        in.close();
+        JSONObject o = new JSONObject(new String(bo.toByteArray(), "UTF-8"));
+        skyCache.put(name, o);
+        return o;
+    }
+
+    private boolean skyMatch(String... parts) {
+        if (searchQuery == null || searchQuery.isEmpty()) return true;
+        String q = searchQuery.toLowerCase();
+        for (String p : parts) {
+            if (p != null && p.toLowerCase().contains(q)) return true;
+        }
+        return false;
+    }
+
+    private TextView skyNote(String s) {
+        TextView t = tv(s, 11, C_DIM, false);
+        t.setPadding(0, dp(4), 0, dp(2));
+        t.setLineSpacing(dp(2), 1f);
+        return t;
+    }
+
+    private void skyLine(String main, String sub) {
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setBackground(round(C_CARD2, 10));
+        box.setPadding(dp(10), dp(8), dp(10), dp(8));
+        LinearLayout.LayoutParams bp = lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        bp.topMargin = dp(8);
+        TextView t1 = tv(main, 13, C_TEXT, false);
+        t1.setTextIsSelectable(true);
+        box.addView(t1);
+        if (sub != null && !sub.isEmpty()) {
+            TextView t2 = tv(sub, 11, C_DIM, false);
+            t2.setPadding(0, dp(2), 0, 0);
+            box.addView(t2);
+        }
+        content.addView(box, bp);
+    }
+
+    private void renderSky() {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        for (int i = 0; i < SKY_CATS.length; i++) {
+            final int idx = i;
+            TextView b = tv(SKY_CATS[i], 12, i == skyCat ? C_ACCENT : C_DIM, true);
+            b.setGravity(Gravity.CENTER);
+            b.setPadding(dp(4), dp(7), dp(4), dp(7));
+            GradientDrawable g = round(i == skyCat ? C_CARD2 : 0x00000000, 10);
+            if (i == skyCat) g.setStroke(dp(1), 0xFF2C5A78);
+            b.setBackground(g);
+            b.setOnClickListener(v -> {
+                skyCat = idx;
+                render();
+            });
+            LinearLayout.LayoutParams p = lp(0, ViewGroup.LayoutParams.WRAP_CONTENT);
+            p.weight = 1f;
+            row.addView(b, p);
+        }
+        content.addView(row);
+        try {
+            if (skyCat == 0) renderSkyItems();
+            else if (skyCat == 1) renderSkySpirits();
+            else if (skyCat == 2) renderSkyDaily();
+            else if (skyCat == 3) renderSkyWorld();
+            else if (skyCat == 4) renderSkySeasons();
+            else renderSkyActivities();
+        } catch (Exception e) {
+            content.addView(hint("资料加载失败：" + e));
+        }
+    }
+
+    private void renderSkyItems() throws Exception {
+        JSONObject doc = skyObj("items");
+        JSONArray arr = doc.optJSONArray("items");
+        int total = arr == null ? 0 : arr.length();
+        content.addView(section("物品/装扮（" + total + "）"));
+        content.addView(skyNote("静态数据 v" + doc.optString("v") + " · 搜索可过滤名称/类型"));
+        int shown = 0;
+        for (int i = 0; i < total && shown < 80; i++) {
+            JSONObject o = arr.getJSONObject(i);
+            String n = o.optString("n");
+            String tc = o.optString("tc", o.optString("t"));
+            String id = o.optString("i");
+            if (!skyMatch(n, tc, id)) continue;
+            skyLine(n, tc + " · " + ("store".equals(o.optString("r")) ? "官方名" : "推导名") + " · " + id);
+            shown++;
+        }
+        if (shown == 0) content.addView(hint("没有匹配的物品"));
+        else if (shown >= 80) content.addView(hint("仅显示前 80 条，可输入关键词继续筛选"));
+    }
+
+    private void renderSkySpirits() throws Exception {
+        JSONObject doc = skyObj("spirits");
+        JSONArray arr = doc.optJSONArray("items");
+        int total = arr == null ? 0 : arr.length();
+        content.addView(section("先祖（" + total + "）"));
+        int shown = 0;
+        for (int i = 0; i < total && shown < 80; i++) {
+            JSONObject o = arr.getJSONObject(i);
+            String n = o.optString("n");
+            String sc = o.optString("sc");
+            String map = o.optString("r");
+            String en = o.optString("en");
+            if (!skyMatch(n, en, sc, map, o.optString("s"))) continue;
+            StringBuilder sub = new StringBuilder();
+            if (!sc.isEmpty()) sub.append(sc);
+            if (!map.isEmpty()) sub.append(sub.length() > 0 ? " · " : "").append(map);
+            if (!en.isEmpty()) sub.append(sub.length() > 0 ? " · " : "").append(en);
+            skyLine(n, sub.toString());
+            shown++;
+        }
+        if (shown == 0) content.addView(hint("没有匹配的先祖"));
+    }
+
+    private void renderSkyDaily() throws Exception {
+        JSONObject doc = skyObj("quests");
+        JSONObject d = doc.optJSONObject("daily");
+        JSONArray arr = d == null ? null : d.optJSONArray("items");
+        int total = arr == null ? 0 : arr.length();
+        content.addView(section("每日任务（" + total + "）"));
+        int shown = 0;
+        for (int i = 0; i < total && shown < 120; i++) {
+            JSONObject o = arr.getJSONObject(i);
+            String n = o.optString("n");
+            String m = o.optString("m");
+            String np = o.optString("np");
+            String g = o.optString("g");
+            if (!skyMatch(n, m, np, g)) continue;
+            StringBuilder sub = new StringBuilder();
+            if (!m.isEmpty()) sub.append(m);
+            if (!np.isEmpty()) sub.append(sub.length() > 0 ? " · " : "").append("由「").append(np).append("」发布");
+            skyLine(n, sub.toString());
+            shown++;
+        }
+        if (shown == 0) content.addView(hint("没有匹配的每日任务"));
+    }
+
+    private void renderSkyWorld() throws Exception {
+        JSONObject doc = skyObj("quests");
+        JSONObject d = doc.optJSONObject("world");
+        JSONArray arr = d == null ? null : d.optJSONArray("items");
+        int total = arr == null ? 0 : arr.length();
+        content.addView(section("世界任务（" + total + "）"));
+        content.addView(skyNote("世界任务只有内部编号与地图，中文标题由游戏内显示"));
+        int shown = 0;
+        for (int i = 0; i < total && shown < 120; i++) {
+            JSONObject o = arr.getJSONObject(i);
+            String id = o.optString("i");
+            String m = o.optString("m");
+            if (!skyMatch(id, m)) continue;
+            skyLine(id, m);
+            shown++;
+        }
+        if (shown == 0) content.addView(hint("没有匹配的世界任务"));
+    }
+
+    private void renderSkySeasons() throws Exception {
+        JSONObject doc = skyObj("seasons");
+        JSONArray arr = doc.optJSONArray("items");
+        int total = arr == null ? 0 : arr.length();
+        content.addView(section("赛季（" + total + "）"));
+        content.addView(skyNote("第 2–32 季中文名；起止时间为排期反推（est=1）"));
+        for (int i = 0; i < total; i++) {
+            JSONObject o = arr.getJSONObject(i);
+            String n = o.optString("zh");
+            String k = o.optString("k");
+            if (!skyMatch(n, k)) continue;
+            skyLine(n, "第 " + o.optInt("n") + " 季 · " + k);
+        }
+    }
+
+    private void renderSkyActivities() throws Exception {
+        JSONObject doc = skyObj("activities");
+        content.addView(section("活动排期（静态快照）"));
+        content.addView(skyNote("快照 " + doc.optString("generated_at") + " · " + doc.optString("note", "数据可能过期")));
+        JSONArray active = doc.optJSONArray("active");
+        if (active != null && active.length() > 0) {
+            content.addView(section("进行中（" + active.length() + "）"));
+            int shown = 0;
+            for (int i = 0; i < active.length() && shown < 40; i++) {
+                JSONObject o = active.getJSONObject(i);
+                String n = o.optString("n");
+                String cn = o.optString("cn");
+                if (!skyMatch(n, cn)) continue;
+                skyLine(cn, n + " · " + o.optString("st") + " ~ " + o.optString("et"));
+                shown++;
+            }
+        }
+        JSONArray up = doc.optJSONArray("upcoming");
+        if (up != null && up.length() > 0) {
+            content.addView(section("即将开始（" + up.length() + "）"));
+            int shown = 0;
+            for (int i = 0; i < up.length() && shown < 40; i++) {
+                JSONObject o = up.getJSONObject(i);
+                String n = o.optString("n");
+                String cn = o.optString("cn");
+                if (!skyMatch(n, cn)) continue;
+                skyLine(cn, n + " · " + o.optString("st") + " ~ " + o.optString("et"));
+                shown++;
+            }
+        }
     }
 
     // ------------------------------------------------------------ 动效
@@ -397,10 +693,15 @@ public class MainActivity extends Activity {
             content.addView(m);
 
             View div = new View(this);
-            div.setBackgroundColor(0xFF243049);
+            div.setBackgroundColor(C_CARD2);
             content.addView(div, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(1)));
 
-            addBody(o.optString("NeteaseMessage", ""));
+            if (!searchQuery.isEmpty() && !matchQuery(searchQuery,
+                    o.optString("Title", ""), o.optString("NeteaseMessage", ""))) {
+                content.addView(hint("没有匹配「" + searchQuery + "」的内容"));
+            } else {
+                addBody(o.optString("NeteaseMessage", ""));
+            }
         } catch (Exception e) {
             content.addView(hint("解析失败：" + e.getMessage()));
         }
@@ -412,6 +713,7 @@ public class MainActivity extends Activity {
         for (String ln : lines) {
             String s = ln.trim();
             if (s.isEmpty()) continue;
+            if (!matchQuery(searchQuery, s)) continue;
             TextView t;
             if (s.startsWith("【") && s.contains("】")) {
                 t = tv(s, 16, C_GOLD, true);
@@ -420,7 +722,7 @@ public class MainActivity extends Activity {
                 t = tv(s, 15, C_TEXT, true);
                 t.setPadding(0, dp(12), 0, dp(4));
             } else {
-                t = tv(s, 14, 0xFFCBD5E8, false);
+                t = tv(s, 14, C_BODY, false);
                 t.setPadding(0, dp(3), 0, dp(3));
             }
             t.setLineSpacing(dp(4), 1f);
@@ -437,18 +739,46 @@ public class MainActivity extends Activity {
         } catch (Exception e) {
             arr = new JSONArray();
         }
+        java.util.LinkedHashMap<String, JSONObject> favs = favMap(this);
+        java.util.List<JSONObject> show = new java.util.ArrayList<>();
+        for (int i = 0; i < arr.length(); i++) {
+            JSONObject o = arr.optJSONObject(i);
+            if (o == null) continue;
+            String id = o.optString("id", "");
+            if (favOnly && !favs.containsKey(id)) continue;
+            if (!searchQuery.isEmpty() && !matchQuery(searchQuery,
+                    o.optString("src", ""), o.optString("t", ""), o.optString("text", ""))) continue;
+            show.add(o);
+        }
         if (arr.length() == 0) {
             content.addView(hint("还没有抓到官方动态\n点右上角 ↻ 抓取（微博 / B 站 / 官网）"));
             return;
         }
-        content.addView(tv("官方动态 · 共 " + arr.length() + " 条（按时间倒序）", 12, C_DIM, false));
-        for (int i = 0; i < arr.length(); i++) {
-            JSONObject o = arr.optJSONObject(i);
-            if (o == null) continue;
+
+        LinearLayout tools = new LinearLayout(this);
+        tools.setOrientation(LinearLayout.HORIZONTAL);
+        tools.setGravity(Gravity.CENTER_VERTICAL);
+        tools.addView(tv("官方动态 · " + (favOnly ? "收藏 " : "") + show.size() + " 条", 12, C_DIM, false),
+                new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        TextView favChip = tv(favOnly ? "★ 只看收藏" : "☆ 收藏", 12, favOnly ? C_GOLD : C_DIM, true);
+        favChip.setPadding(dp(10), dp(4), dp(10), dp(4));
+        favChip.setBackground(round(C_CARD2, 10));
+        favChip.setOnClickListener(v -> { favOnly = !favOnly; render(); });
+        tools.addView(favChip);
+        content.addView(tools);
+
+        if (show.isEmpty()) {
+            content.addView(hint(searchQuery.isEmpty() ? "还没有收藏\n点卡片右上角 ☆ 收藏" : "没有匹配「" + searchQuery + "」的动态"));
+            return;
+        }
+        for (JSONObject o : show) {
+            final String id = o.optString("id", "");
+            boolean stale = o.optBoolean("stale", false);
             LinearLayout card = new LinearLayout(this);
             card.setOrientation(LinearLayout.VERTICAL);
             card.setPadding(dp(12), dp(10), dp(12), dp(12));
             card.setBackground(round(C_CARD2, 12));
+            card.setAlpha(stale ? 0.55f : 1f);
             LinearLayout.LayoutParams clp = lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
             clp.topMargin = dp(8);
             card.setLayoutParams(clp);
@@ -460,16 +790,84 @@ public class MainActivity extends Activity {
             LinearLayout.LayoutParams tlp2 = lp(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
             tlp2.leftMargin = dp(8);
             head.addView(tv(o.optString("t", ""), 11, C_DIM, false), tlp2);
+            if (stale) {
+                LinearLayout.LayoutParams slp2 = lp(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                slp2.leftMargin = dp(8);
+                TextView st = tv("旧", 9, C_DIM, true);
+                st.setBackground(round(0x33FFFFFF, 5));
+                st.setPadding(dp(5), dp(1), dp(5), dp(1));
+                head.addView(st, slp2);
+            }
+            TextView star = tv(favs.containsKey(id) ? "★" : "☆", 20, favs.containsKey(id) ? C_GOLD : C_DIM, false);
+            star.setPadding(dp(8), 0, 0, 0);
+            star.setOnClickListener(v -> {
+                toggleFav(MainActivity.this, o);
+                render();
+            });
+            head.addView(star, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
             card.addView(head);
 
-            TextView body = tv(o.optString("text", ""), 14, C_TEXT, false);
+            String fullText = o.optString("text", "");
+            String brief = fullText.length() > 220 ? fullText.substring(0, 220) + "…" : fullText;
+            TextView body = tv(brief, 14, stale ? C_DIM : C_TEXT, false);
             body.setLineSpacing(dp(4), 1f);
             body.setPadding(0, dp(8), 0, 0);
             card.addView(body);
 
             final String url = o.optString("url", "");
-            if (!url.isEmpty()) card.setOnClickListener(v -> open(url));
+            final String itemTitle = o.optString("t", "");
+            card.setOnClickListener(v -> openItem(url, itemTitle, fullText));
             content.addView(card);
+        }
+    }
+
+    /** 搜索：大小写不敏感，任一字段包含即命中。 */
+    static boolean matchQuery(String q, String... fields) {
+        if (q == null || q.trim().isEmpty()) return true;
+        String needle = q.trim().toLowerCase(Locale.CHINA);
+        for (String f : fields) {
+            if (f != null && f.toLowerCase(Locale.CHINA).contains(needle)) return true;
+        }
+        return false;
+    }
+
+    /** 收藏存储：id -> {id,src,t,text,url,ts} */
+    static java.util.LinkedHashMap<String, JSONObject> favMap(Context c) {
+        java.util.LinkedHashMap<String, JSONObject> map = new java.util.LinkedHashMap<>();
+        try {
+            JSONObject o = new JSONObject(pref(c).getString("favs", "{}"));
+            java.util.Iterator<String> it = o.keys();
+            while (it.hasNext()) {
+                String k = it.next();
+                JSONObject v = o.optJSONObject(k);
+                if (v != null) map.put(k, v);
+            }
+        } catch (Exception ignore) {
+        }
+        return map;
+    }
+
+    static void toggleFav(Context c, JSONObject item) {
+        java.util.LinkedHashMap<String, JSONObject> map = favMap(c);
+        String id = item.optString("id", "");
+        if (id.isEmpty()) return;
+        JSONObject obj = new JSONObject();
+        try {
+            if (map.containsKey(id)) {
+                map.remove(id);
+            } else {
+                obj.put("id", id);
+                obj.put("src", item.optString("src", ""));
+                obj.put("t", item.optString("t", ""));
+                obj.put("text", item.optString("text", ""));
+                obj.put("url", item.optString("url", ""));
+                obj.put("ts", item.optLong("ts", 0));
+                map.put(id, obj);
+            }
+            JSONObject out = new JSONObject();
+            for (java.util.Map.Entry<String, JSONObject> e : map.entrySet()) out.put(e.getKey(), e.getValue());
+            pref(c).edit().putString("favs", out.toString()).apply();
+        } catch (Exception ignore) {
         }
     }
 
@@ -531,7 +929,24 @@ public class MainActivity extends Activity {
 
     /** 带 Referer/Cookie 的 GET：B 站与官网 JSON 接口都只认浏览器 UA + 来源页。 */
     static String http(String url, String referer, String cookie) throws Exception {
+        Exception last = null;
+        for (int attempt = 0; attempt < 3; attempt++) {
+            try {
+                return httpOnce(url, referer, cookie);
+            } catch (Exception e) {
+                last = e;
+                if (attempt < 2) {
+                    try { Thread.sleep(400L * (attempt + 1)); } catch (InterruptedException ie) { break; }
+                }
+            }
+        }
+        throw last == null ? new RuntimeException("网络失败") : last;
+    }
+
+    static String httpOnce(String url, String referer, String cookie) throws Exception {
         HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
+        c.setConnectTimeout(8000);
+        c.setReadTimeout(8000);
         c.setConnectTimeout(12000);
         c.setReadTimeout(20000);
         c.setRequestProperty("User-Agent", UA_WEB);
@@ -595,6 +1010,7 @@ public class MainActivity extends Activity {
         List<JSONObject> items = new ArrayList<>();
         StringBuilder err = new StringBuilder();
         SimpleDateFormat fmt = new SimpleDateFormat("MM-dd HH:mm", Locale.CHINA);
+        long t0 = System.currentTimeMillis();
 
         // 1) 官网新闻列表（公告 / 更新 / 活动 / 攻略）
         try {
@@ -617,6 +1033,7 @@ public class MainActivity extends Activity {
             }
         } catch (Exception e) {
             err.append("官网:").append(e.getMessage()).append('\n');
+            markHealth(ctx, "官网", false, 0, System.currentTimeMillis() - t0, e.getMessage());
         }
 
         // 2) TapTap 官方帖（社区官方号，免登录；缺 X-UA 会 400）
@@ -645,6 +1062,7 @@ public class MainActivity extends Activity {
             }
         } catch (Exception e) {
             err.append("TapTap:").append(e.getMessage()).append('\n');
+            markHealth(ctx, "TapTap", false, 0, System.currentTimeMillis() - t0, e.getMessage());
         }
 
         // 2) B 站官方动态（访客 cookie + WBI 签名，无需登录）
@@ -696,6 +1114,7 @@ public class MainActivity extends Activity {
             }
         } catch (Exception e) {
             err.append("B站:").append(e.getMessage()).append('\n');
+            markHealth(ctx, "B站", false, 0, System.currentTimeMillis() - t0, e.getMessage());
         }
 
         // 4) 官网公告正文（与「公告」页同源，作为动态时间线里的一条）
@@ -713,16 +1132,50 @@ public class MainActivity extends Activity {
             items.add(it);
         } catch (Exception e) {
             err.append("公告:").append(e.getMessage()).append('\n');
+            markHealth(ctx, "公告", false, 0, System.currentTimeMillis() - t0, e.getMessage());
         }
 
-        // 5) 云中继（可选）：微博/抖音/小红书由云端抓，App 只拉统一 JSON
+        // 5) 云中继：同时兼容旧 schema（updated/count/problems/items）与 schema:2（sources+items）
         String relay = pref(ctx).getString("relay_url", U_RELAY_DEFAULT);
+        java.util.Set<String> relayFailed = new java.util.HashSet<>();
         if (!relay.isEmpty()) {
             try {
+                long rt = System.currentTimeMillis();
                 String body = http(relay, null, null);
                 JSONArray arr;
-                if (body.trim().startsWith("[")) arr = new JSONArray(body);
-                else arr = new JSONObject(body).optJSONArray("items");
+                JSONObject relayDoc = null;
+                if (body.trim().startsWith("[")) {
+                    arr = new JSONArray(body);
+                } else {
+                    relayDoc = new JSONObject(body);
+                    JSONArray it = relayDoc.optJSONArray("items");
+                    arr = it == null ? new JSONArray() : it;
+                }
+                // schema:2：逐源健康 + 失败源（失败源保留旧条目并灰显）
+                JSONObject srcs = relayDoc == null ? null : relayDoc.optJSONObject("sources");
+                if (srcs != null) {
+                    java.util.Iterator<String> sk = srcs.keys();
+                    while (sk.hasNext()) {
+                        String sn = sk.next();
+                        JSONObject so = srcs.optJSONObject(sn);
+                        if (so == null) continue;
+                        boolean sok = so.optBoolean("ok", true);
+                        markHealth(ctx, "中继·" + sn, sok, so.optInt("count", 0),
+                                so.optLong("elapsed_ms", 0), so.optString("error", ""));
+                        if (!sok) relayFailed.add(sn);
+                    }
+                }
+                // 旧 schema：problems 形如 "B站: HTTPError 412"
+                if (relayDoc != null) {
+                    JSONArray probs = relayDoc.optJSONArray("problems");
+                    for (int i = 0; probs != null && i < probs.length(); i++) {
+                        String p = probs.optString(i, "");
+                        int c = p.indexOf(':');
+                        String name = (c > 0 ? p.substring(0, c) : p).trim();
+                        if (!name.isEmpty()) relayFailed.add(name);
+                        markHealth(ctx, "中继·" + name, false, 0, 0, p);
+                    }
+                }
                 java.util.Set<String> have = new java.util.HashSet<>();
                 for (JSONObject x : items) have.add(x.optString("id", ""));
                 for (int i = 0; arr != null && i < arr.length(); i++) {
@@ -731,32 +1184,40 @@ public class MainActivity extends Activity {
                     String baseId = o.optString("id", "i" + i);
                     if (have.contains(baseId)) continue;   // 本地已抓到（官网/TapTap/B站），不重复
                     have.add(baseId);
+                    boolean schema2 = o.has("source") || o.has("title") || o.has("summary");
                     JSONObject it = new JSONObject();
                     it.put("id", "rl-" + baseId);
-                    it.put("src", o.optString("src", "中继"));
-                    it.put("t", o.optString("t", ""));
+                    it.put("src", o.optString(schema2 ? "source" : "src", "中继"));
+                    it.put("t", o.optString(schema2 ? "title" : "t", o.optString("time", "")));
                     it.put("ts", o.optLong("ts", 0));
-                    it.put("text", o.optString("text", ""));
+                    it.put("text", o.optString(schema2 ? "summary" : "text", o.optString("text", "")));
                     it.put("url", o.optString("url", ""));
                     items.add(it);
                 }
+                markHealth(ctx, "中继", true, arr == null ? 0 : arr.length(),
+                        System.currentTimeMillis() - rt, "");
             } catch (Exception e) {
                 err.append("中继:").append(e.getMessage()).append('\n');
+                markHealth(ctx, "中继", false, 0, System.currentTimeMillis() - t0, e.getMessage());
+                relayFailed.add("中继");
             }
         }
 
         int added = mergeFeed(ctx, items);
+        applyStale(ctx, relayFailed);
         SharedPreferences sp = pref(ctx);
         boolean init = sp.getBoolean("feed_init", false);
         sp.edit().putString("feed_err", err.toString())
                 .putLong("feed_check", System.currentTimeMillis())
                 .putBoolean("feed_init", true).apply();
-        if (added > 0 && init) notifyFeed(ctx, added, items.isEmpty() ? "" : items.get(0).optString("text", ""));
+        if (added > 0 && init) notifyFeed(ctx, added, items.isEmpty() ? "" : items.get(0).optString("text", ""),
+                items.isEmpty() ? "" : items.get(0).optString("url", ""));
         return added;
     }
 
-    static void notifyFeed(Context c, int added, String sample) {
+    static void notifyFeed(Context c, int added, String sample, String url) {
         try {
+            if (!notifyAllowed(c, sample)) return;
             NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
             String brief = sample.replace("\n", " ").trim();
             if (brief.length() > 100) brief = brief.substring(0, 100) + "…";
@@ -766,7 +1227,7 @@ public class MainActivity extends Activity {
                     .setContentText(brief)
                     .setStyle(new Notification.BigTextStyle().bigText(brief))
                     .setAutoCancel(true)
-                    .setContentIntent(pi(c))
+                    .setContentIntent(pi(c, url))
                     .build();
             nm.notify(NID_FEED, n);
         } catch (Throwable ignore) {
@@ -788,6 +1249,7 @@ public class MainActivity extends Activity {
         for (int i = arr.length() - 1; i >= 0; i--) {
             JSONObject o = arr.optJSONObject(i);
             if (o == null) continue;
+            if (!searchQuery.isEmpty() && !matchQuery(searchQuery, o.optString("title", ""), o.optString("t", ""))) continue;
             LinearLayout row = new LinearLayout(this);
             row.setOrientation(LinearLayout.VERTICAL);
             row.setPadding(dp(12), dp(10), dp(12), dp(10));
@@ -948,7 +1410,7 @@ public class MainActivity extends Activity {
             h2.setPadding(0, dp(16), 0, dp(4));
             content.addView(h2);
             for (Win w : current) {
-                content.addView(tv("· " + w.start + " → " + w.end + "  " + w.title, 13, 0xFFCBD5E8, false));
+                content.addView(tv("· " + w.start + " → " + w.end + "  " + w.title, 13, C_BODY, false));
             }
         }
     }
@@ -1122,7 +1584,7 @@ public class MainActivity extends Activity {
             TextView b = tv(names[i], 12, on ? C_ACCENT : C_DIM, true);
             b.setGravity(Gravity.CENTER);
             b.setPadding(0, dp(9), 0, dp(9));
-            GradientDrawable g = round(on ? 0xFF16283D : C_CARD2, 10);
+            GradientDrawable g = round(on ? C_CARD2 : C_CARD2, 10);
             if (on) g.setStroke(dp(1), 0xFF2C5A78);
             b.setBackground(g);
             b.setOnClickListener(x -> {
@@ -1201,6 +1663,115 @@ public class MainActivity extends Activity {
             content.addView(tv("最近取证：" + lastEv + (evErr.isEmpty() ? " ✓" : "（失败：" + evErr + "）"), 10, C_DIM, false));
         }
 
+        // 深色模式（三态）
+        content.addView(section("深色模式"));
+        int tmode = themeMode(this);
+        String[] tnames = {"跟随系统", "浅色", "深色"};
+        int[] tvals = {THEME_AUTO, THEME_LIGHT, THEME_DARK};
+        LinearLayout trow = new LinearLayout(this);
+        trow.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout.LayoutParams trlp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        trlp.topMargin = dp(8);
+        trow.setLayoutParams(trlp);
+        for (int i = 0; i < tnames.length; i++) {
+            final int v = tvals[i];
+            boolean on = v == tmode;
+            TextView b = tv(tnames[i], 12, on ? C_ACCENT : C_DIM, true);
+            b.setGravity(Gravity.CENTER);
+            b.setPadding(0, dp(9), 0, dp(9));
+            GradientDrawable g = round(on ? C_CARD2 : C_CARD, 10);
+            if (on) g.setStroke(dp(1), C_ACCENT);
+            b.setBackground(g);
+            b.setOnClickListener(x -> {
+                pref(MainActivity.this).edit().putInt("theme_mode", v).apply();
+                applyTheme(MainActivity.this);
+                recreate();
+            });
+            LinearLayout.LayoutParams bl = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+            if (i > 0) bl.leftMargin = dp(8);
+            trow.addView(b, bl);
+        }
+        content.addView(trow);
+
+        // 通知过滤（白/黑名单 + 免打扰）
+        content.addView(section("通知过滤（关键词白/黑名单 + 免打扰）"));
+        EditText kwWhite = editBox(sp.getString("nf_kw_white", ""), "白名单关键词（逗号分隔，空=全部）");
+        EditText kwBlack = editBox(sp.getString("nf_kw_black", ""), "黑名单关键词（逗号分隔）");
+        content.addView(kwWhite);
+        content.addView(kwBlack);
+        TextView saveKw = bigBtn("保存通知关键词", C_ACCENT);
+        saveKw.setOnClickListener(x -> {
+            sp.edit().putString("nf_kw_white", kwWhite.getText().toString().trim())
+                    .putString("nf_kw_black", kwBlack.getText().toString().trim()).apply();
+            toast("已保存通知过滤关键词");
+            render();
+        });
+        content.addView(saveKw);
+        boolean dnd = sp.getBoolean("nf_dnd", true);
+        TextView dndBtn = bigBtn(dnd ? "● 免打扰已开启" : "○ 免打扰已关闭", dnd ? 0xFF7BE3A5 : C_TEXT);
+        dndBtn.setOnClickListener(x -> {
+            boolean now = pref(MainActivity.this).getBoolean("nf_dnd", true);
+            pref(MainActivity.this).edit().putBoolean("nf_dnd", !now).apply();
+            toast(now ? "已关闭免打扰" : "已开启免打扰");
+            render();
+        });
+        content.addView(dndBtn);
+        LinearLayout dndRow = new LinearLayout(this);
+        dndRow.setOrientation(LinearLayout.HORIZONTAL);
+        dndRow.addView(editBox(String.valueOf(sp.getInt("nf_dnd_start", 23)), "开始小时(0-23)"),
+                new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        dlp.leftMargin = dp(8);
+        EditText eEnd = editBox(String.valueOf(sp.getInt("nf_dnd_end", 7)), "结束小时(0-23)");
+        dndRow.addView(eEnd, dlp);
+        content.addView(dndRow);
+        TextView saveDnd = bigBtn("保存免打扰时段", C_TEXT);
+        saveDnd.setOnClickListener(x -> {
+            try {
+                int s = Integer.parseInt(((EditText) dndRow.getChildAt(0)).getText().toString().trim());
+                int e = Integer.parseInt(eEnd.getText().toString().trim());
+                sp.edit().putInt("nf_dnd_start", Math.max(0, Math.min(23, s)))
+                        .putInt("nf_dnd_end", Math.max(0, Math.min(23, e))).apply();
+                toast("已保存免打扰时段");
+            } catch (Exception ex) {
+                toast("请输入 0-23 的整数小时");
+            }
+            render();
+        });
+        content.addView(saveDnd);
+
+        // 源健康
+        content.addView(section("源健康（最近一次抓取）"));
+        String health = sp.getString("src_health", "");
+        if (health.isEmpty()) {
+            content.addView(tv("还没有抓取记录", 11, C_DIM, false));
+        } else {
+            try {
+                JSONObject h = new JSONObject(health);
+                java.util.Iterator<String> it = h.keys();
+                while (it.hasNext()) {
+                    String name = it.next();
+                    JSONObject hrow = h.optJSONObject(name);
+                    if (hrow == null) continue;
+                    boolean ok = hrow.optBoolean("ok", false);
+                    String line = (ok ? "✅ " : "⚠️ ") + name + "  " + (ok ? "正常" : "失败")
+                            + (ok ? " · " + hrow.optInt("count", 0) + " 条" : "")
+                            + (hrow.optLong("elapsed_ms", 0) > 0 ? " · " + hrow.optLong("elapsed_ms") + "ms" : "")
+                            + (hrow.optString("last_success", "").isEmpty() ? "" : " · 上次成功 " + hrow.optString("last_success"))
+                            + (ok ? "" : " · " + hrow.optString("error", ""));
+                    TextView hl = tv(line, 11, ok ? C_BODY : 0xFFFF9E9E, false);
+                    hl.setPadding(0, dp(3), 0, dp(3));
+                    content.addView(hl);
+                }
+            } catch (Exception ignore) {
+            }
+        }
+
+        content.addView(section("关于"));
+        content.addView(tv("SkyNews（光遇公告阅读器）v2.5 (7)", 13, C_TEXT, true));
+        content.addView(tv("数据源：官方公告/新闻、TapTap、B站、云中继；抓取失败会保留旧条目（灰显）", 11, C_DIM, false));
+        content.addView(tv("构建：无 Gradle（javac + aapt2 + d8 + apksigner）", 11, C_DIM, false));
+
         content.addView(section("其它"));
         TextView clear = bigBtn("清空变更历史", 0xFFFF9E9E);
         clear.setOnClickListener(x -> {
@@ -1213,6 +1784,22 @@ public class MainActivity extends Activity {
         TextView test = bigBtn("立即检测一次", C_ACCENT);
         test.setOnClickListener(x -> refresh(true));
         content.addView(test);
+    }
+
+    private EditText editBox(String text, String hint) {
+        EditText e = new EditText(this);
+        e.setText(text);
+        e.setHint(hint);
+        e.setTextSize(13);
+        e.setTextColor(C_TEXT);
+        e.setHintTextColor(C_DIM);
+        e.setSingleLine(true);
+        e.setBackground(round(C_CARD2, 10));
+        e.setPadding(dp(10), dp(7), dp(10), dp(7));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.topMargin = dp(8);
+        e.setLayoutParams(lp);
+        return e;
     }
 
     private TextView section(String s) {
@@ -1243,7 +1830,9 @@ public class MainActivity extends Activity {
     private void updateStatus() {
         SharedPreferences sp = pref(this);
         String srv = sp.getString("server_date", "");
-        tvStatus.setText("上次检测 " + sp.getString("last_check", "—")
+        long lastOk = sp.getLong("feed_check", 0);
+        String okStr = lastOk > 0 ? new SimpleDateFormat("MM-dd HH:mm", Locale.CHINA).format(new Date(lastOk)) : "—";
+        tvStatus.setText("上次成功 " + okStr + " · 检测 " + sp.getString("last_check", "—")
                 + (srv.isEmpty() ? "" : " · 服务器 " + srv)
                 + " · 每 " + (sp.getBoolean("fast", false) && sp.getBoolean("fgs", false) ? "1 分钟" : sp.getInt("interval", 15) + " 分钟")
                 + (sp.getString("official_lm", "").isEmpty() ? "" : " · 官方 " + shortTime(sp.getString("official_lm", ""))));
@@ -1254,6 +1843,11 @@ public class MainActivity extends Activity {
     private void refresh(final boolean manual) {
         if (busy) {
             if (manual) toast("正在抓取…");
+            return;
+        }
+        if (!online(this)) {
+            if (manual) toast("无网络，已跳过抓取");
+            updateStatus();
             return;
         }
         busy = true;
@@ -1432,9 +2026,24 @@ public class MainActivity extends Activity {
     }
 
     static String http(String url) throws Exception {
+        Exception last = null;
+        for (int attempt = 0; attempt < 3; attempt++) {
+            try {
+                return httpOnce(url);
+            } catch (Exception e) {
+                last = e;
+                if (attempt < 2) {
+                    try { Thread.sleep(400L * (attempt + 1)); } catch (InterruptedException ie) { break; }
+                }
+            }
+        }
+        throw last == null ? new RuntimeException("网络失败") : last;
+    }
+
+    static String httpOnce(String url) throws Exception {
         HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
-        c.setConnectTimeout(15000);
-        c.setReadTimeout(20000);
+        c.setConnectTimeout(8000);
+        c.setReadTimeout(8000);
         c.setRequestProperty("User-Agent", "SkyAnnounce/2.0 (Android)");
         c.setRequestProperty("Accept-Encoding", "gzip");
         try {
@@ -1508,7 +2117,12 @@ public class MainActivity extends Activity {
     }
 
     static PendingIntent pi(Context c) {
+        return pi(c, "");
+    }
+
+    static PendingIntent pi(Context c, String url) {
         Intent i = new Intent(c, MainActivity.class);
+        if (url != null && !url.isEmpty()) i.putExtra("open_url", url);
         i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         int f = PendingIntent.FLAG_UPDATE_CURRENT;
         if (Build.VERSION.SDK_INT >= 23) f |= PendingIntent.FLAG_IMMUTABLE;
@@ -1516,6 +2130,7 @@ public class MainActivity extends Activity {
     }
 
     static void notifyAnn(Context c, String title, String body) {
+        if (!notifyAllowed(c, title + " " + body)) return;
         NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
         String brief = body.replace("\n", " ").trim();
         if (brief.length() > 120) brief = brief.substring(0, 120) + "…";
@@ -1525,7 +2140,7 @@ public class MainActivity extends Activity {
                 .setContentText(brief)
                 .setStyle(new Notification.BigTextStyle().bigText(brief))
                 .setAutoCancel(true)
-                .setContentIntent(pi(c))
+                .setContentIntent(pi(c, U_ANN))
                 .build();
         nm.notify(NID_ANN, n);
     }
@@ -1547,6 +2162,7 @@ public class MainActivity extends Activity {
         public boolean onStartJob(final JobParameters p) {
             new Thread(() -> {
                 try {
+                    if (!online(getApplicationContext())) { jobFinished(p, false); return; }
                     String ann = http(U_ANN);
                     rememberOfficial(getApplicationContext());
                     String age = http(U_AGE);
@@ -1608,6 +2224,10 @@ public class MainActivity extends Activity {
                 worker = new Thread(() -> {
                     while (run) {
                         try {
+                            if (!online(getApplicationContext())) {
+                                try { Thread.sleep(60_000L); } catch (InterruptedException e) { break; }
+                                continue;
+                            }
                             String ann = http(U_ANN);
                             rememberOfficial(getApplicationContext());
                             String age = http(U_AGE);
@@ -1647,7 +2267,203 @@ public class MainActivity extends Activity {
         }
     }
 
+    // ------------------------------------------------------------ 内置 WebView 阅读页
+
+    public static class ReaderActivity extends Activity {
+        private WebView web;
+
+        @Override
+        protected void onCreate(Bundle b) {
+            super.onCreate(b);
+            String u0 = getIntent().getStringExtra("url");
+            if (u0 != null && u0.startsWith("http://")) u0 = "https://" + u0.substring(7); // 明文链接升级，避免被系统禁明文
+            final String url = u0;
+            final String content = getIntent().getStringExtra("content");
+            LinearLayout root = new LinearLayout(this);
+            root.setOrientation(LinearLayout.VERTICAL);
+            root.setBackgroundColor(C_BG);
+
+            LinearLayout bar = new LinearLayout(this);
+            bar.setOrientation(LinearLayout.HORIZONTAL);
+            bar.setPadding(dp(10), dp(8), dp(10), dp(8));
+            bar.setGravity(Gravity.CENTER_VERTICAL);
+            TextView close = barBtn("关闭");
+            TextView copy = barBtn("复制链接");
+            TextView browser = barBtn("浏览器打开");
+            bar.addView(close, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+            bar.addView(copy, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+            bar.addView(browser, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+            root.addView(bar);
+
+            web = new WebView(this);
+            web.getSettings().setJavaScriptEnabled(true);
+            web.getSettings().setDomStorageEnabled(true);
+            web.getSettings().setLoadWithOverviewMode(true);
+            web.getSettings().setUseWideViewPort(true);
+            web.setBackgroundColor(C_BG);
+            web.setWebViewClient(new WebViewClient() {
+                @Override
+                public boolean shouldOverrideUrlLoading(WebView v, String u) {
+                    v.loadUrl(u);
+                    return true;
+                }
+
+                @Override
+                public void onReceivedError(WebView v, int code, String desc, String failingUrl) {
+                    // 加载失败 → 回退系统浏览器，并关闭阅读页
+                    try {
+                        startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+                    } catch (Throwable ignore) {
+                    }
+                    finish();
+                }
+            });
+            LinearLayout.LayoutParams wlp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0);
+            wlp.weight = 1f;
+            root.addView(web, wlp);
+            setContentView(root);
+
+            close.setOnClickListener(v -> finish());
+            copy.setOnClickListener(v -> {
+                android.content.ClipboardManager cm = (android.content.ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                cm.setPrimaryClip(android.content.ClipData.newPlainText("url", url == null ? "" : url));
+                Toast.makeText(this, "已复制链接", Toast.LENGTH_SHORT).show();
+            });
+            browser.setOnClickListener(v -> {
+                try {
+                    startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+                } catch (Throwable e) {
+                    Toast.makeText(this, "没有可用的浏览器", Toast.LENGTH_SHORT).show();
+                }
+            });
+            if (content != null && !content.trim().isEmpty()) {
+                String html = android.text.TextUtils.htmlEncode(content).replace("\n", "<br/>");
+                web.loadDataWithBaseURL(null, "<html><head><meta name='viewport' content='width=device-width'/></head>"
+                        + "<body style='background:" + String.format("#%06X", 0xFFFFFF & C_BG)
+                        + ";color:" + String.format("#%06X", 0xFFFFFF & C_TEXT)
+                        + ";font-size:16px;line-height:1.6;padding:14px'>" + html + "</body></html>",
+                        "text/html", "UTF-8", null);
+            } else if (url != null && url.startsWith("http")) {
+                web.loadUrl(url);
+            } else {
+                Toast.makeText(this, "没有可显示的内容", Toast.LENGTH_SHORT).show();
+            }
+        }
+
+        private int dp(float v) {
+            return Math.round(getResources().getDisplayMetrics().density * v);
+        }
+
+        private TextView barBtn(String s) {
+            TextView tv = new TextView(this);
+            tv.setText(s);
+            tv.setTextSize(13);
+            tv.setTextColor(C_ACCENT);
+            tv.setGravity(Gravity.CENTER);
+            tv.setPadding(dp(6), dp(9), dp(6), dp(9));
+            GradientDrawable g = new GradientDrawable();
+            g.setColor(C_CARD2);
+            g.setCornerRadius(dp(10));
+            tv.setBackground(g);
+            return tv;
+        }
+    }
+
     // ------------------------------------------------------------ 工具
+
+    /** 是否有可用网络（无网直接跳过抓取，不重试轰炸） */
+    static boolean online(Context c) {
+        try {
+            ConnectivityManager cm = (ConnectivityManager) c.getSystemService(Context.CONNECTIVITY_SERVICE);
+            NetworkInfo ni = cm == null ? null : cm.getActiveNetworkInfo();
+            return ni != null && ni.isConnected();
+        } catch (Throwable e) {
+            return true; // 拿不到状态时不阻塞抓取
+        }
+    }
+
+    /** 记录每源健康：ok/count/elapsed/last_success/error（设置页展示） */
+    static synchronized void markHealth(Context c, String name, boolean ok, int count, long elapsedMs, String error) {
+        try {
+            SharedPreferences sp = pref(c);
+            JSONObject all;
+            try {
+                all = new JSONObject(sp.getString("src_health", "{}"));
+            } catch (Exception e) {
+                all = new JSONObject();
+            }
+            JSONObject row = all.optJSONObject(name);
+            if (row == null) row = new JSONObject();
+            row.put("ok", ok);
+            row.put("count", count);
+            row.put("elapsed_ms", elapsedMs);
+            row.put("error", error == null ? "" : error);
+            if (ok) row.put("last_success", new SimpleDateFormat("MM-dd HH:mm", Locale.CHINA).format(new Date()));
+            row.put("at", System.currentTimeMillis());
+            all.put(name, row);
+            sp.edit().putString("src_health", all.toString()).apply();
+        } catch (Throwable ignore) {
+        }
+    }
+
+    /** 失败源保留旧条目并标 stale（灰显）；成功源清除 stale。 */
+    static synchronized void applyStale(Context c, java.util.Set<String> failed) {
+        try {
+            JSONArray arr = new JSONArray(pref(c).getString("feed", "[]"));
+            java.util.Set<String> local = new java.util.HashSet<>();
+            local.add("官网"); local.add("TapTap"); local.add("B站"); local.add("公告");
+            boolean relayDown = failed.contains("中继");
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject o = arr.optJSONObject(i);
+                if (o == null) continue;
+                String src = o.optString("src", "");
+                boolean st = false;
+                for (String f : failed) {
+                    if (f.equals("中继")) continue;
+                    if (src.startsWith(f)) { st = true; break; }
+                }
+                if (relayDown && !local.contains(src)) st = true;
+                if (st) o.put("stale", true);
+                else o.remove("stale");
+            }
+            pref(c).edit().putString("feed", arr.toString()).apply();
+        } catch (Throwable ignore) {
+        }
+    }
+
+    /** 通知是否允许：白名单非空需命中、黑名单命中即静音、免打扰时段静音 */
+    static boolean notifyAllowed(Context c, String text) {
+        try {
+            SharedPreferences sp = pref(c);
+            String t = text == null ? "" : text.toLowerCase(Locale.CHINA);
+            String white = sp.getString("nf_kw_white", "").trim();
+            String black = sp.getString("nf_kw_black", "").trim();
+            if (!black.isEmpty()) {
+                for (String kw : black.split("[,，]")) {
+                    if (!kw.trim().isEmpty() && t.contains(kw.trim().toLowerCase(Locale.CHINA))) return false;
+                }
+            }
+            if (!white.isEmpty()) {
+                boolean hit = false;
+                for (String kw : white.split("[,，]")) {
+                    if (!kw.trim().isEmpty() && t.contains(kw.trim().toLowerCase(Locale.CHINA))) { hit = true; break; }
+                }
+                if (!hit) return false;
+            }
+            if (sp.getBoolean("nf_dnd", true)) {
+                int start = sp.getInt("nf_dnd_start", 23);
+                int end = sp.getInt("nf_dnd_end", 7);
+                int hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY);
+                boolean in;
+                if (start == end) in = false;
+                else if (start < end) in = hour >= start && hour < end;
+                else in = hour >= start || hour < end;
+                if (in) return false;
+            }
+        } catch (Throwable ignore) {
+        }
+        return true;
+    }
 
     static SharedPreferences pref(Context c) {
         return c.getSharedPreferences("skynews", Context.MODE_PRIVATE);
@@ -1658,7 +2474,31 @@ public class MainActivity extends Activity {
         cm.setPrimaryClip(ClipData.newPlainText("sky", s));
     }
 
+    /** 默认用内置阅读页（可回退浏览器）；失败时退回系统浏览器。 */
     private void open(String url) {
+        try {
+            Intent i = new Intent(this, ReaderActivity.class);
+            i.putExtra("url", url);
+            startActivity(i);
+        } catch (Throwable t) {
+            openBrowser(url);
+        }
+    }
+
+    /** 点卡片：有链接走阅读页；没有链接但有全文 → 阅读页显示全文 */
+    private void openItem(String url, String title, String text) {
+        if (url != null && !url.isEmpty()) {
+            open(url);
+        } else if (text != null && !text.trim().isEmpty()) {
+            Intent i = new Intent(this, ReaderActivity.class);
+            i.putExtra("content", (title == null ? "" : title + "\n\n") + text);
+            startActivity(i);
+        } else {
+            toast("没有可打开的链接");
+        }
+    }
+
+    private void openBrowser(String url) {
         try {
             startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
         } catch (Exception e) {

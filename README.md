@@ -141,3 +141,15 @@ https://sixhorse.game.163.com/news/outer/newslist_search.do?start=1&limit=40&con
 - 不带图标/资源，纯代码 UI；想加图标把 PNG 放进 res 再改 build.sh 的 aapt2 参数即可。
 - 动态页的 B 站源依赖 `buvid3` 访客 cookie + WBI 签名，B 站改签名规则时需要同步更新 `wbiQuery()`；
   微博源在当前网络被 432 风控，App 内不做重试轰炸。
+
+---
+
+## v2.5 更新（2026-11-12）
+
+- **抓取稳定性（重点）**：每源独立 8s 超时 + 2 次指数退避重试；无网跳过；设置页「源健康」（ok/耗时/最后成功）；中继旧 schema 与 schema:2 双兼容；失败源保留旧条目并灰显 stale。
+- **新增「资料」页**：物品/装扮 1748、先祖 243、每日任务 404、世界任务 368、赛季 31、活动排期（静态快照），支持搜索；数据在 `app/assets/sky/`（0.16.8 / 421629）。
+- **阅读体验**：全局搜索（公告/动态/历史）、★收藏 + 只看收藏、内嵌 WebView 阅读页、深色模式三态（跟随/浅色/深色）。
+- **通知**：关键词白/黑名单、免打扰时段、点击直达条目。
+- **构建/发布**：新增 `build_win.ps1`（PC 无 Gradle 构建）、`release.ps1`（自动构建 → dist + build-info）、`tools/smoke_test_apk.ps1`（装机冒烟）；修复 Windows 下 aapt2 资源名反斜杠 + zipalign 对齐问题。
+- **云中继 v2**（`relay/`）：schema:2、源健康、失败回退 stale、跨源去重、微博/抖音/小红书（cookie/RSSHub）、CI 内容变化才提交；详见 `relay/STABILITY.md`。
+- 版本：versionName 2.5 / versionCode 7。
