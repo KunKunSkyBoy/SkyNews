@@ -34,7 +34,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from email.utils import parsedate_to_datetime
 
 SCHEMA = 2
@@ -492,7 +492,7 @@ def _daily_from_t1qq():
             lines.append("%d. %s" % (i + 1, txt))
     if not lines:
         raise RuntimeError("应天API 返回空任务")
-    date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    date = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d")  # 北京时间
     return date, "今日每日任务：\n" + "\n".join(lines)
 
 
