@@ -1,26 +1,26 @@
 {
  "schema": 2,
- "generated_at": "2026-11-11T16:53:16Z",
- "updated": "2026-11-11T16:53:16Z",
+ "generated_at": "2026-11-11T16:55:13Z",
+ "updated": "2026-11-11T16:55:13Z",
  "count": 30,
  "sources": {
   "official": {
    "ok": true,
    "count": 30,
    "error": null,
-   "elapsed_ms": 1253,
-   "last_success": "2026-11-11T16:53:14Z"
+   "elapsed_ms": 1535,
+   "last_success": "2026-11-11T16:54:55Z"
   },
   "weibo": {
    "ok": false,
    "count": 0,
-   "error": "URLError: <urlopen error [Errno -5] No address associated with hostname>（重试 3 次）",
-   "elapsed_ms": 2953,
+   "error": "RuntimeError: 未配置 WEIBO_COOKIE/RSSHUB_BASE，公开时间线不可用（公开时间线不可用：JSON 解析失败: Expecting value: line 1 column 1 (char 0)）（重试 3 次）",
+   "elapsed_ms": 19171,
    "last_success": null
   }
  },
  "problems": [
-  "微博: URLError: <urlopen error [Errno -5] No address associated with hostname>（重试 3 次）"
+  "微博: RuntimeError: 未配置 WEIBO_COOKIE/RSSHUB_BASE，公开时间线不可用（公开时间线不可用：JSON 解析失败: Expecting value: line 1 column 1 (char 0)）（重试 3 次）"
  ],
  "items": [
   {
