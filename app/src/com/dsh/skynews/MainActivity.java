@@ -100,6 +100,8 @@ public class MainActivity extends Activity {
     static final int NID_FEED = 1003;
     static final int NID_DAILY = 1004;
     static final int NID_SHARD = 1007;
+    static final int NID_FUKE = 1008;
+    static final String CH_FUKE = "sky_fuke_channel";
     static final String CH_SHARD = "sky_shard_channel2";
     static final String ACTION_SHARD = "com.dsh.skynews.SHARD_ALARM";
     static final String CH_ANN = "sky_ann_channel";
@@ -150,6 +152,8 @@ public class MainActivity extends Activity {
     private TextView copyBtn;
     /** 碎片页每分钟自刷新（进行中/剩余分钟） */
     private boolean shardTimer = false;
+    /** 资料页「先祖」里已展开兑换树的先祖 id */
+    private final java.util.Set<String> spiritOpen = new java.util.HashSet<>();
     private final java.util.ArrayList<TextView> TOP_TEXTS = new java.util.ArrayList<>();
     static volatile String NET_LASTMOD = "";
     private ScrollView scroller;
@@ -368,6 +372,12 @@ public class MainActivity extends Activity {
                 toast("已复制碎片日程（" + txt.length() + " 字）");
                 return;
             }
+            if (tab == 7 && skyCat == 1) {
+                String txt = spiritCopyText();
+                clip(txt);
+                toast("已复制先祖兑换树（" + txt.length() + " 字）");
+                return;
+            }
             String raw = pref(this).getString("ann_json", "");
             try {
                 JSONObject o = parseLoose(raw);
@@ -416,7 +426,7 @@ public class MainActivity extends Activity {
     private void render() {
         if (copyBtn != null) {
             copyBtn.setVisibility(tab == 8 ? View.GONE : View.VISIBLE);
-            String label = tab == 6 ? "复制石头" : tab == 5 ? "复制日历" : tab == 4 ? "复制预载" : tab == 1 ? "复制动态" : tab == 0 ? "复制全文" : "复制";
+            String label = tab == 7 && skyCat == 1 ? "复制先祖" : tab == 6 ? "复制石头" : tab == 5 ? "复制日历" : tab == 4 ? "复制预载" : tab == 1 ? "复制动态" : tab == 0 ? "复制全文" : "复制";
             copyBtn.setText(label);
         }
         for (int i = 0; i < tabRow.getChildCount(); i++) {
@@ -512,7 +522,7 @@ public class MainActivity extends Activity {
                 {"红石天气", "gytq"}, {"季节蜡烛图", "scjl"},
                 {"大蜡烛图", "scdl"}, {"复刻先祖", "scfk"},
                 {"活动日历", "hdrl"}, {"每日任务位置图", "scrw"},
-                {"季节倒计时", "djs"}
+                {"季节倒计时", "djs"}, {"近期日程", "calendar"}
         };
         LinearLayout row = null;
         for (int i = 0; i < tools.length; i++) {
@@ -599,26 +609,284 @@ public class MainActivity extends Activity {
     }
 
     private void renderSkySpirits() throws Exception {
-        JSONObject doc = skyObj("spirits");
-        JSONArray arr = doc.optJSONArray("items");
+        JSONObject doc = skyObj("ancestors");
+        JSONArray arr = doc == null ? null : doc.optJSONArray("spirits");
         int total = arr == null ? 0 : arr.length();
-        content.addView(section("先祖（" + total + "）"));
+        content.addView(section("复刻先祖"));
+        renderFukeCard();
+        content.addView(section("先祖兑换树（" + total + "）"));
+        content.addView(skyNote("点一行展开/收起兑换树；搜索可按名称、季节、地图过滤。▸ 未展开 · ▾ 已展开"));
         int shown = 0;
-        for (int i = 0; i < total && shown < 80; i++) {
+        for (int i = 0; i < total && shown < 200; i++) {
             JSONObject o = arr.getJSONObject(i);
+            final String id = o.optString("id");
             String n = o.optString("n");
+            String en = o.optString("en");
             String sc = o.optString("sc");
             String map = o.optString("r");
-            String en = o.optString("en");
-            if (!skyMatch(n, en, sc, map, o.optString("s"))) continue;
+            JSONArray tree = o.optJSONArray("tree");
+            if (!skyMatch(n, en, sc, map, id)) continue;
+            boolean open = spiritOpen.contains(id);
+
+            LinearLayout box = new LinearLayout(this);
+            box.setOrientation(LinearLayout.VERTICAL);
+            box.setBackground(round(C_CARD2, 10));
+            box.setPadding(dp(10), dp(8), dp(10), dp(8));
+            LinearLayout.LayoutParams bp = lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            bp.topMargin = dp(8);
+            box.setLayoutParams(bp);
+            box.addView(tv((open ? "▾ " : "▸ ") + n, 13, open ? C_ACCENT : C_TEXT, true));
             StringBuilder sub = new StringBuilder();
             if (!sc.isEmpty()) sub.append(sc);
             if (!map.isEmpty()) sub.append(sub.length() > 0 ? " · " : "").append(map);
+            if (tree != null) sub.append(sub.length() > 0 ? " · " : "").append("兑换 ").append(tree.length()).append(" 项");
+            String sumText = costSummary(tree);
+            if (!sumText.isEmpty()) sub.append(" · 合计 ").append(sumText);
             if (!en.isEmpty()) sub.append(sub.length() > 0 ? " · " : "").append(en);
-            skyLine(n, sub.toString());
+            TextView t2 = tv(sub.toString(), 11, C_DIM, false);
+            t2.setPadding(0, dp(2), 0, 0);
+            box.addView(t2);
+            box.setOnClickListener(v -> {
+                if (!spiritOpen.remove(id)) spiritOpen.add(id);
+                render();
+            });
+            content.addView(box);
+
+            if (open && tree != null) {
+                for (int k = 0; k < tree.length(); k++) {
+                    JSONObject nd = tree.getJSONObject(k);
+                    int d = nd.optInt("d");
+                    String branch = nd.optString("b");
+                    String nm = nd.optString("n", "?");
+                    String ty = nd.optString("ty", "");
+                    String cost = costText(nd.optJSONObject("c"));
+                    StringBuilder line = new StringBuilder();
+                    if (!branch.isEmpty()) {
+                        line.append("nw".equals(branch) ? "├ " : "ne".equals(branch) ? "└ " : "│ ");
+                    }
+                    line.append(itemCn(nm));
+                    if (!ty.isEmpty()) line.append(" · ").append(tyText(ty));
+                    if (!cost.isEmpty()) line.append("  ").append(cost);
+                    TextView tn = tv(line.toString(), 12, nd.optInt("hid") == 1 ? C_DIM : C_TEXT, false);
+                    tn.setPadding(dp(12 + d * 14), dp(2), dp(6), dp(2));
+                    content.addView(tn);
+                }
+            }
             shown++;
         }
         if (shown == 0) content.addView(hint("没有匹配的先祖"));
+    }
+
+    /** 整棵兑换树的成本合计（只统计正数项）。 */
+    private static String costSummary(JSONArray tree) {
+        if (tree == null) return "";
+        int candle = 0, heart = 0, season = 0, ascended = 0, event = 0;
+        for (int i = 0; i < tree.length(); i++) {
+            JSONObject nd = tree.optJSONObject(i);
+            JSONObject c = nd == null ? null : nd.optJSONObject("c");
+            if (c == null) continue;
+            candle += c.optInt("candle", 0);
+            heart += c.optInt("heart", 0);
+            season += c.optInt("season_candle", 0);
+            ascended += c.optInt("ascended", 0);
+            event += c.optInt("event_currency", 0);
+        }
+        StringBuilder sb = new StringBuilder();
+        if (candle > 0) sb.append("白蜡").append(candle);
+        if (heart > 0) sb.append(sb.length() > 0 ? " + " : "").append("心").append(heart);
+        if (season > 0) sb.append(sb.length() > 0 ? " + " : "").append("季蜡").append(season);
+        if (ascended > 0) sb.append(sb.length() > 0 ? " + " : "").append("升华").append(ascended);
+        if (event > 0) sb.append(sb.length() > 0 ? " + " : "").append("代币").append(event);
+        return sb.toString();
+    }
+
+    /** 成本文本：candle=白蜡 heart=爱心 season_candle=季节蜡烛 ascended=升华 event_currency=活动代币 */
+    private static String costText(JSONObject c) {
+        if (c == null) return "";
+        StringBuilder sb = new StringBuilder();
+        String[][] map = {{"candle", "白蜡"}, {"heart", "心"}, {"season_candle", "季蜡"},
+                {"ascended", "升华"}, {"event_currency", "代币"}, {"special", "特殊"}};
+        for (String[] m : map) {
+            int v = c.optInt(m[0], 0);
+            if (v > 0) {
+                if (sb.length() > 0) sb.append(" + ");
+                sb.append(m[1]).append(v);
+            }
+        }
+        return sb.toString();
+    }
+
+    /** 常见物品名的中文化（其余保留英文原名，类型已中文）。 */
+    private static String itemCn(String n) {
+        if (n == null) return "";
+        if (n.startsWith("Quest ")) return "任务" + n.substring(6);
+        switch (n) {
+            case "Heart": return "爱心";
+            case "Wing Buff": return "光之翼";
+            case "Small Blessing": return "小祝福";
+            case "Blessing": return "祝福";
+            case "Handstand": return "倒立";
+            case "Handstand 2": return "倒立 2 级";
+            case "Float": return "漂浮";
+            default: return n;
+        }
+    }
+
+    private static String tyText(String ty) {
+        if (ty == null) return "";
+        switch (ty) {
+            case "Emote": return "动作";
+            case "WingBuff": return "光之翼";
+            case "Special": return "祝福/道具";
+            case "Hair": return "发型";
+            case "Cape": return "斗篷";
+            case "Mask": return "面具";
+            case "Outfit": return "套装";
+            case "Prop": return "道具";
+            case "Quest": return "任务";
+            case "MusicSheet": return "乐谱";
+            case "Instrument": return "乐器";
+            case "Necklace": return "项链";
+            case "HairAccessory": return "发饰";
+            case "FaceAccessory": return "面饰";
+            case "Shoes": return "鞋子";
+            case "Furniture": return "家具";
+            case "Spell": return "魔法";
+            default: return ty;
+        }
+    }
+
+    static String joinCn(String sep, java.util.List<String> list) {
+        StringBuilder sb = new StringBuilder();
+        for (String s : list) {
+            if (sb.length() > 0) sb.append(sep);
+            sb.append(s);
+        }
+        return sb.toString();
+    }
+
+    /** 从 assets/sky/ancestors.json 里找出文本中出现的先祖名（最多 6 个）。 */
+    static java.util.List<String> fukeHitsIn(Context c, String text) {
+        java.util.ArrayList<String> out = new java.util.ArrayList<>();
+        if (text == null || text.isEmpty()) return out;
+        try {
+            java.io.InputStream in = c.getAssets().open("sky/ancestors.json");
+            java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream();
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = in.read(buf)) > 0) bo.write(buf, 0, n);
+            in.close();
+            JSONObject doc = new JSONObject(new String(bo.toByteArray(), "UTF-8"));
+            JSONArray arr = doc.optJSONArray("spirits");
+            for (int i = 0; arr != null && i < arr.length(); i++) {
+                String nm = arr.getJSONObject(i).optString("n");
+                if (nm.length() >= 2 && text.contains(nm)) out.add(nm);
+                if (out.size() >= 6) break;
+            }
+        } catch (Throwable ignore) {
+        }
+        return out;
+    }
+
+    /** 复刻相关措辞：要求「复刻/返场」与「先祖」出现在同一句且相邻，避免活动公告里的泛用词误判。 */
+    private static boolean fukeMention(String text) {
+        if (text == null || text.isEmpty()) return false;
+        return java.util.regex.Pattern
+                .compile("复刻[^。！？\\n]{0,20}先祖|先祖[^。！？\\n]{0,20}复刻|返场[^。！？\\n]{0,20}先祖|先祖[^。！？\\n]{0,20}返场")
+                .matcher(text).find();
+    }
+
+    /** 从「复刻」附近抓日期（优先复刻，其次返场；40 字窗口内），按日期排序。 */
+    private static java.util.List<String> fukeDates(String text) {
+        final java.util.ArrayList<String> out = new java.util.ArrayList<>();
+        if (text == null) return out;
+        java.util.regex.Pattern dp = java.util.regex.Pattern.compile("(\\d{1,2})月(\\d{1,2})日");
+        for (String kw : new String[]{"复刻", "返场"}) {
+            java.util.regex.Matcher mm = java.util.regex.Pattern
+                    .compile(java.util.regex.Pattern.quote(kw) + "[^\\n]{0,40}").matcher(text);
+            while (mm.find() && out.size() < 6) {
+                java.util.regex.Matcher d = dp.matcher(mm.group(0));
+                while (d.find() && out.size() < 6) {
+                    String s = d.group(1) + "月" + d.group(2) + "日";
+                    if (!out.contains(s)) out.add(s);
+                }
+            }
+            if (!out.isEmpty()) break;   // 有「复刻」就不再看「返场」
+        }
+        java.util.Collections.sort(out, (a, b) -> {
+            int[] x = parseMonthDay(a), y = parseMonthDay(b);
+            return x[0] != y[0] ? x[0] - y[0] : x[1] - y[1];
+        });
+        return out;
+    }
+
+    private static int[] parseMonthDay(String s) {
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("(\\d{1,2})月(\\d{1,2})日").matcher(s);
+        if (m.find()) return new int[]{Integer.parseInt(m.group(1)), Integer.parseInt(m.group(2))};
+        return new int[]{99, 99};
+    }
+
+    private void renderFukeCard() {
+        String text = pref(this).getString("ann_json", "") + "\n" + pref(this).getString("feed", "");
+        boolean mention = fukeMention(text);
+        java.util.List<String> hits = fukeHitsIn(this, text);
+        java.util.List<String> dates = fukeDates(text);
+
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setBackground(round(C_CARD2, 10));
+        box.setPadding(dp(12), dp(10), dp(12), dp(12));
+        LinearLayout.LayoutParams bp = lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        bp.topMargin = dp(8);
+        box.setLayoutParams(bp);
+        if (!hits.isEmpty()) {
+            box.addView(tv("公告 / 动态提到：" + joinCn("、", hits), 14, C_ACCENT, true));
+        } else if (!dates.isEmpty()) {
+            box.addView(tv("官方动态：复刻日期 " + joinCn("、", dates) + "（未点名先祖）", 14, C_ACCENT, true));
+        } else if (mention) {
+            box.addView(tv("公告 / 动态出现「复刻 / 返场」，但未点名先祖", 13, C_TEXT, false));
+        } else {
+            box.addView(tv("暂未从公告 / 动态识别到复刻信息", 13, C_DIM, false));
+        }
+        TextView tip = tv("国服复刻以遇境祭坛和官方公告为准；下方兑换树为离线数据，可离线查看。", 11, C_DIM, false);
+        tip.setPadding(0, dp(6), 0, 0);
+        box.addView(tip);
+        content.addView(box);
+    }
+
+    private String spiritCopyText() {
+        StringBuilder sb = new StringBuilder("【光·遇】先祖兑换树\n");
+        try {
+            JSONObject doc = skyObj("ancestors");
+            JSONArray arr = doc.optJSONArray("spirits");
+            boolean onlyOpen = !spiritOpen.isEmpty();
+            int n = 0;
+            for (int i = 0; arr != null && i < arr.length() && n < 30; i++) {
+                JSONObject o = arr.getJSONObject(i);
+                String id = o.optString("id");
+                String name = o.optString("n");
+                if (!skyMatch(name, o.optString("en"), o.optString("sc"), o.optString("r"), id)) continue;
+                if (onlyOpen && !spiritOpen.contains(id)) continue;
+                JSONArray tree = o.optJSONArray("tree");
+                sb.append('\n').append(name);
+                String sc = o.optString("sc");
+                if (!sc.isEmpty()) sb.append("（").append(sc).append("）");
+                sb.append('\n');
+                for (int k = 0; tree != null && k < tree.length(); k++) {
+                    JSONObject nd = tree.getJSONObject(k);
+                    sb.append("  ");
+                    for (int d = 0; d < nd.optInt("d"); d++) sb.append("  ");
+                    sb.append(nd.optString("n"));
+                    String cost = costText(nd.optJSONObject("c"));
+                    if (!cost.isEmpty()) sb.append(" ").append(cost);
+                    sb.append('\n');
+                }
+                n++;
+            }
+        } catch (Exception e) {
+            sb.append("\n读取失败：").append(e);
+        }
+        return sb.toString();
     }
 
     private void renderSkyDaily() throws Exception {
@@ -2113,6 +2381,18 @@ content.addView(section("检测频率"));
         });
         content.addView(srb);
 
+        boolean fr = sp.getBoolean("fuke_remind", true);
+        TextView frb = bigBtn(fr ? "● 复刻先祖提醒：开（公告 / 动态出现复刻时）"
+                        : "○ 复刻先祖提醒：关",
+                fr ? 0xFF7BE3A5 : C_TEXT);
+        frb.setOnClickListener(x -> {
+            boolean now = pref(MainActivity.this).getBoolean("fuke_remind", true);
+            pref(MainActivity.this).edit().putBoolean("fuke_remind", !now).apply();
+            toast(now ? "已关闭复刻先祖提醒" : "已开启：公告 / 动态出现复刻时提醒");
+            render();
+        });
+        content.addView(frb);
+
         content.addView(section("变更取证（自动存档）"));
         boolean cap = sp.getBoolean("capture", true);
         TextView cp = bigBtn(cap ? "● 官方接口快照：开（零依赖，自带证据）" : "○ 官方接口快照：关", cap ? 0xFF7BE3A5 : C_TEXT);
@@ -2246,7 +2526,7 @@ content.addView(section("检测频率"));
         }
 
         content.addView(section("关于"));
-        content.addView(tv("SkyNews（光遇公告阅读器）v4.0 (15)", 13, C_TEXT, true));
+        content.addView(tv("SkyNews（光遇公告阅读器）v4.1 (16)", 13, C_TEXT, true));
         content.addView(tv("数据源：官方公告/新闻、TapTap、B站、云中继；抓取失败会保留旧条目（灰显）", 11, C_DIM, false));
         content.addView(tv("构建：无 Gradle（javac + aapt2 + d8 + apksigner）", 11, C_DIM, false));
 
@@ -2599,6 +2879,9 @@ content.addView(section("检测频率"));
         NotificationChannel sch = new NotificationChannel(CH_SHARD, "碎片提醒", NotificationManager.IMPORTANCE_HIGH);
         sch.setDescription("红石 / 黑石开始前 10 分钟提醒");
         nm.createNotificationChannel(sch);
+        NotificationChannel fk = new NotificationChannel(CH_FUKE, "复刻先祖", NotificationManager.IMPORTANCE_DEFAULT);
+        fk.setDescription("公告或官方动态出现复刻先祖信息时提醒");
+        nm.createNotificationChannel(fk);
         try {   // 早期版本用过的废渠道（通知 id 1005 在该渠道下会被系统丢弃）
             nm.deleteNotificationChannel("sky_shard_channel");
         } catch (Throwable ignore) {
@@ -2852,6 +3135,71 @@ content.addView(section("检测频率"));
         }
     }
 
+    /** 公告 / 动态出现复刻字样时提醒一次（同内容只提醒一次）。 */
+    static void maybeNotifyFuke(Context c) {
+        try {
+            SharedPreferences sp = pref(c);
+            if (!sp.getBoolean("fuke_remind", true)) return;
+            String text = sp.getString("ann_json", "") + "\n" + sp.getString("feed", "");
+            if (text.isEmpty()) return;
+            if (!fukeMention(text)) return;
+            String digest;
+            try {
+                digest = Integer.toHexString(text.hashCode());
+            } catch (Throwable t) {
+                digest = "x";
+            }
+            String key = "fuke_sent_" + digest;
+            if (sp.getBoolean(key, false)) return;
+            java.util.List<String> hits = fukeHitsIn(c, text);
+            java.util.List<String> dates = fukeDates(text);
+            String title;
+            String body;
+            if (!hits.isEmpty()) {
+                title = "复刻先祖：" + joinCn("、", hits);
+                body = "公告 / 动态提到上述先祖，可到「资料 → 先祖」查看兑换树";
+            } else if (!dates.isEmpty()) {
+                title = "复刻先祖：" + joinCn("、", dates) + " 有复刻";
+                body = "官方动态提到的复刻日期，具体是哪位先祖见图或游戏内";
+            } else {
+                title = "复刻先祖：出现新的复刻 / 返场信息";
+                body = "公告或官方动态里出现了「复刻 / 返场」，点开看详情";
+            }
+            if (!notifyAllowed(c, title + " " + body, true)) return;
+            NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
+            Notification n = new Notification.Builder(c, CH_FUKE)
+                    .setSmallIcon(android.R.drawable.ic_dialog_info)
+                    .setContentTitle(title)
+                    .setContentText(body)
+                    .setStyle(new Notification.BigTextStyle().bigText(body))
+                    .setAutoCancel(true)
+                    .setContentIntent(pi(c))
+                    .build();
+            nm.notify(NID_FUKE, n);
+            sp.edit().putBoolean(key, true).apply();
+        } catch (Throwable ignore) {
+        }
+    }
+
+    /** 调试用：直接发一条复刻提醒样例（不读公告）。 */
+    static void notifyFukeSample(Context c) {
+        try {
+            NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
+            String title = "复刻先祖：剧团团长";
+            String body = "公告 / 动态提到上述先祖，可到「资料 → 先祖」查看兑换树";
+            Notification n = new Notification.Builder(c, CH_FUKE)
+                    .setSmallIcon(android.R.drawable.ic_dialog_info)
+                    .setContentTitle(title)
+                    .setContentText(body)
+                    .setStyle(new Notification.BigTextStyle().bigText(body))
+                    .setAutoCancel(true)
+                    .setContentIntent(pi(c))
+                    .build();
+            nm.notify(NID_FUKE, n);
+        } catch (Throwable ignore) {
+        }
+    }
+
     public static class ShardReceiver extends BroadcastReceiver {
         @Override
         public void onReceive(Context c, Intent i) {
@@ -2859,6 +3207,9 @@ content.addView(section("检测频率"));
             android.util.Log.i("SkyShard", "recv force=" + force);
             maybeNotifyShard(c, force);
             scheduleShardAlarms(c);
+            if (i != null && i.getBooleanExtra("fuke", false)) {
+                notifyFukeSample(c);
+            }
         }
     }
 
@@ -2880,6 +3231,7 @@ content.addView(section("检测频率"));
             new Thread(() -> {
                     maybeDailyReminder(getApplicationContext());
                 try { maybeNotifyShard(getApplicationContext()); } catch (Throwable ignore) {}
+                    try { maybeNotifyFuke(getApplicationContext()); } catch (Throwable ignore) {}
                 try {
                     if (!online(getApplicationContext())) { jobFinished(p, false); return; }
                     String ann = http(U_ANN);
@@ -2946,6 +3298,7 @@ content.addView(section("检测频率"));
                     while (run) {
                         try { maybeDailyReminder(getApplicationContext()); } catch (Throwable ignore) {}
                         try { maybeNotifyShard(getApplicationContext()); } catch (Throwable ignore) {}
+                    try { maybeNotifyFuke(getApplicationContext()); } catch (Throwable ignore) {}
                         try {
                             if (!online(getApplicationContext())) {
                                 try { Thread.sleep(60_000L); } catch (InterruptedException e) { break; }
@@ -3128,6 +3481,7 @@ content.addView(section("检测频率"));
             case "xhs": return "小红书";
             case "daily": return "每日任务";
             case "extra": return "速览";
+            case "calendar": return "日历";
             default: return key;
         }
     }
