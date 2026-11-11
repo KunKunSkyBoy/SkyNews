@@ -1,10 +1,10 @@
 {
     "name": "SkyNews",
     "package": "com.dsh.skynews",
-    "versionName": "4.0",
-    "versionCode": "15",
-    "builtAt": "2026-11-12T03:02:00+08:00",
-    "sha256": "f0cf506c6a6c15695386164c093b8532e6033386ce3619aa56fb09a4b573a7e8",
-    "size": 269740,
-    "apk": "E:\\gongzuoqu\\SkyNews\\SkyNews-20261111(1)\\SkyNews\\dist\\SkyNews-v4.0.apk"
+    "versionName": "4.1",
+    "versionCode": "16",
+    "builtAt": "2026-11-12T03:27:00+08:00",
+    "sha256": "a44cd62a1222c3582f109674d4474c80f048b3e6a66b985df91c1762b5adf002",
+    "size": 298483,
+    "apk": "E:\\gongzuoqu\\SkyNews\\SkyNews-20261111(1)\\SkyNews\\dist\\SkyNews-v4.1.apk"
 }
