@@ -1295,7 +1295,9 @@ public class MainActivity extends Activity {
                     it.put("id", "rl-" + baseId);
                     it.put("src", o.optString(schema2 ? "source" : "src", "中继"));
                     it.put("t", o.optString(schema2 ? "title" : "t", o.optString("time", "")));
-                    it.put("ts", o.optLong("ts", 0));
+                    long rts = o.optLong("ts", 0);
+                    if (rts > 0 && rts < 100000000000L) rts *= 1000L; // 中继 ts 是秒，统一成毫秒
+                    it.put("ts", rts);
                     it.put("text", o.optString(schema2 ? "summary" : "text", o.optString("text", "")));
                     it.put("url", o.optString("url", ""));
                     it.put("stale", o.optBoolean("stale", false));
@@ -2188,7 +2190,7 @@ content.addView(section("检测频率"));
         }
 
         content.addView(section("关于"));
-        content.addView(tv("SkyNews（光遇公告阅读器）v3.0 (12)", 13, C_TEXT, true));
+        content.addView(tv("SkyNews（光遇公告阅读器）v3.1 (13)", 13, C_TEXT, true));
         content.addView(tv("数据源：官方公告/新闻、TapTap、B站、云中继；抓取失败会保留旧条目（灰显）", 11, C_DIM, false));
         content.addView(tv("构建：无 Gradle（javac + aapt2 + d8 + apksigner）", 11, C_DIM, false));
 
@@ -2754,14 +2756,19 @@ content.addView(section("检测频率"));
                 if (idx < 0) return;
             }
             String dayKey = new SimpleDateFormat("yyyyMMdd", Locale.CHINA).format(day.getTime());
-            String key = "shard_sent_" + dayKey + "_" + idx + (force ? "_dbg" : "");
+            // 调试触发带分钟戳，避免被去重挡住；正常提醒仍按「日期+窗口」去重
+            String key = "shard_sent_" + dayKey + "_" + idx
+                    + (force ? "_dbg" + (System.currentTimeMillis() / 60000L) : "");
             if (sp.getBoolean(key, false)) return;
             String kind = d.isRed ? "红石" : "黑石";
             String title = kind + " 10 分钟后开始";
             StringBuilder body = new StringBuilder(d.place)
                     .append(" · ").append(shardWin(d.times[idx]));
             if (d.isRed) body.append(" · 升华×").append(trimNum(d.reward));
-            if (!notifyAllowed(c, title + " " + body)) return;
+            if (!notifyAllowed(c, title + " " + body, true)) {
+                android.util.Log.i("SkyShard", "blocked by filter");
+                return;
+            }
             NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
             Notification n = new Notification.Builder(c, CH_SHARD)
                     .setSmallIcon(android.R.drawable.ic_dialog_info)
@@ -2772,15 +2779,25 @@ content.addView(section("检测频率"));
                     .setContentIntent(shardOpenPi(c))
                     .build();
             nm.notify(NID_SHARD, n);
+            int active = -1;
+            try {
+                android.service.notification.StatusBarNotification[] cur = nm.getActiveNotifications();
+                active = cur == null ? -1 : cur.length;
+            } catch (Throwable ignore) {
+            }
+            android.util.Log.i("SkyShard", "posted title=" + title + " body=" + body + " active=" + active);
             sp.edit().putBoolean(key, true).apply();
-        } catch (Throwable ignore) {
+        } catch (Throwable t) {
+            android.util.Log.w("SkyShard", "notify failed: " + t, t);
         }
     }
 
     public static class ShardReceiver extends BroadcastReceiver {
         @Override
         public void onReceive(Context c, Intent i) {
-            maybeNotifyShard(c, i != null && i.getBooleanExtra("force", false));
+            boolean force = i != null && i.getBooleanExtra("force", false);
+            android.util.Log.i("SkyShard", "recv force=" + force);
+            maybeNotifyShard(c, force);
             scheduleShardAlarms(c);
         }
     }
@@ -3123,6 +3140,11 @@ content.addView(section("检测频率"));
 
     /** 通知是否允许：白名单非空需命中、黑名单命中即静音、免打扰时段静音 */
     static boolean notifyAllowed(Context c, String text) {
+        return notifyAllowed(c, text, false);
+    }
+
+    /** ignoreDnd=true 时跳过免打扰时段（碎片这类到点事件用）。 */
+    static boolean notifyAllowed(Context c, String text, boolean ignoreDnd) {
         try {
             SharedPreferences sp = pref(c);
             String t = text == null ? "" : text.toLowerCase(Locale.CHINA);
@@ -3140,7 +3162,7 @@ content.addView(section("检测频率"));
                 }
                 if (!hit) return false;
             }
-            if (sp.getBoolean("nf_dnd", true)) {
+            if (!ignoreDnd && sp.getBoolean("nf_dnd", true)) {
                 int start = sp.getInt("nf_dnd_start", 23);
                 int end = sp.getInt("nf_dnd_end", 7);
                 int hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY);
