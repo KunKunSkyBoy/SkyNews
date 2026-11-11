@@ -108,6 +108,7 @@ function Deploy-GitHub {
             @{ src = 'README.md'; dst = 'README.md'; dir = $false },
             @{ src = 'README-使用说明.md'; dst = 'README-使用说明.md'; dir = $false },
             @{ src = 'UPGRADE_PLAN.md'; dst = 'UPGRADE_PLAN.md'; dir = $false },
+            @{ src = 'HANDOVER.md'; dst = 'HANDOVER.md'; dir = $false },
             @{ src = 'docs'; dst = 'docs'; dir = $true }
         )
         foreach ($it in $items) {
