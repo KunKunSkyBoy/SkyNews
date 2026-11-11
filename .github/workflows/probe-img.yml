@@ -1,0 +1,57 @@
+name: probe-img
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe image endpoints
+        env:
+          T1KEY: ${{ secrets.T1QQ_KEY }}
+        run: |
+          python3 - <<'PY'
+          import os, urllib.request, urllib.parse, socket
+
+          key = os.environ.get('T1KEY', '')
+          print('key len:', len(key))
+
+          base = [
+              ('scjl', 'https://api.t1qq.com/api/sky/sc/scjl?key=%s' % key),
+              ('scdl', 'https://api.t1qq.com/api/sky/sc/scdl?key=%s' % key),
+              ('scfk', 'https://api.t1qq.com/api/sky/sc/scfk?key=%s' % key),
+              ('hdrl', 'https://api.t1qq.com/api/sky/sc/hdrl?key=%s' % key),
+          ]
+
+          def probe(name, url, extra=None):
+              hdr = {'User-Agent': 'Mozilla/5.0', 'Accept': 'image/*,*/*', 'Referer': 'https://api.t1qq.com/'}
+              if extra: hdr.update(extra)
+              try:
+                  req = urllib.request.Request(url, headers=hdr)
+                  r = urllib.request.urlopen(req, timeout=30)
+                  b = r.read()
+                  print(name, 'status', r.status, 'bytes', len(b), 'head', b[:6].hex())
+              except Exception as e:
+                  print(name, 'ERR', type(e).__name__, str(e)[:120])
+
+          for n, u in base:
+              probe('direct_' + n, u)
+
+          # via wsrv.nl image proxy
+          for n, u in base:
+              prox = 'https://wsrv.nl/?url=' + urllib.parse.quote(u, safe='') + '&n=-1'
+              probe('wsrv_' + n, prox, {'Accept': '*/*'})
+
+          # oivio pages calendar image (keyless)
+          try:
+              import json
+              data = json.load(urllib.request.urlopen(
+                  urllib.request.Request('https://oivio-up.github.io/SkyDailyInfo/data.json',
+                                         headers={'User-Agent': 'Mozilla/5.0'}), timeout=30))
+              cal = ((data.get('calendar') or {}).get('images') or [])
+              print('oivio calendar images:', len(cal), (cal[0].get('src') if cal else ''))
+              if cal:
+                  probe('oivio_cal', 'https://oivio-up.github.io/SkyDailyInfo/' + cal[0]['src'].lstrip('/'))
+          except Exception as e:
+              print('oivio ERR', str(e)[:120])
+          PY
