@@ -147,7 +147,7 @@ def make_item(ident, source, title, url, ts=None, summary=""):
     else:
         stamp_note = ""
     title = clean_text(title, 300)
-    summary = clean_text(summary, 800)
+    summary = clean_text(summary, 4000)
     text = (title + ("\n" + summary if summary and summary != title else "")).strip()
     it = {
         "id": str(ident),
@@ -362,7 +362,7 @@ def _weibo_web_pages():
                     ts = parse_weibo_time(mb.get("created_at"))
                     text = re.sub(r"<[^>]+>", "", mb.get("text", ""))
                     out.append(make_item("wb-" + str(mb.get("id", "")), "weibo",
-                                         clean_text(text, 120),
+                                         clean_text(text, 4000),
                                          "https://m.weibo.cn/detail/" + str(mb.get("id", "")),
                                          ts, re.sub(r"<[^>]+>", " ", mb.get("text", ""))))
                 if out:
@@ -387,7 +387,7 @@ def src_weibo():
                 continue
             ts = parse_weibo_time(mb.get("created_at"))
             out.append(make_item("wb-" + str(mb.get("id", "")), "weibo",
-                                 clean_text(re.sub(r"<[^>]+>", "", mb.get("text", "")), 120),
+                                 clean_text(re.sub(r"<[^>]+>", "", mb.get("text", "")), 4000),
                                  "https://m.weibo.cn/detail/" + str(mb.get("id", "")),
                                  ts, re.sub(r"<[^>]+>", " ", mb.get("text", ""))))
         if out:
@@ -499,7 +499,7 @@ def src_bili():
                     text = (opus.get("summary") or {}).get("text") or \
                         (major.get("archive") or {}).get("title") or ""
                 did = row.get("id_str", "")
-                out.append(make_item("bl-" + did, "bili", clean_text(text, 120),
+                out.append(make_item("bl-" + did, "bili", clean_text(text, 4000),
                                      "https://t.bilibili.com/" + did, au.get("pub_ts", 0),
                                      text))
             return out
