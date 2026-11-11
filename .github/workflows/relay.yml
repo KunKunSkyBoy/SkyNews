@@ -40,7 +40,7 @@ concurrency:
 env:
   PYTHONUNBUFFERED: "1"
   # 源开关：tap=TapTap 官方帖、official=官网、bili=B站、weibo/douyin/xhs 见 relay/README.md
-  SKYNEWS_SOURCES: ${{ github.event.inputs.sources || 'tap,official,bili,weibo,douyin,xhs' }}
+  SKYNEWS_SOURCES: ${{ github.event.inputs.sources || 'tap,official,bili,weibo,douyin,xhs,daily' }}
   # CI 默认跳过 B 站（412）；手动触发可传 bili_ci=1
   SKYNEWS_BILI_CI: ${{ github.event.inputs.bili_ci || '0' }}
   SKYNEWS_TIMEOUT: "8"
@@ -68,6 +68,7 @@ jobs:
       - name: 抓取并生成 feed（失败自动重试 3 轮）
         env:
           WEIBO_COOKIE: ${{ secrets.WEIBO_COOKIE }}
+          SKYNEWS_DAILY_KEY: ${{ secrets.UNICORN_KEY }}
           RSSHUB_BASE: ${{ github.event.inputs.rsshub || vars.RSSHUB_BASE }}
         run: |
           set -e
