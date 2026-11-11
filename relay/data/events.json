@@ -1,0 +1,86 @@
+[
+  {
+    "enabled": true,
+    "id": "wiki-traveling_spirit-旅行先祖：奔离旅行者-1112",
+    "type": "traveling_spirit",
+    "title": "【复刻】奔离旅行者",
+    "start": "2026-11-11T22:00:00.000Z",
+    "end": "2026-11-16T04:00:00.000Z",
+    "source": "wiki",
+    "wikiUrl": "https://wiki.biligame.com/sky/%E6%97%85%E8%A1%8C%E5%85%88%E7%A5%96%EF%BC%9A%E5%A5%94%E7%A6%BB%E6%97%85%E8%A1%8C%E8%80%85",
+    "_source": "wiki"
+  },
+  {
+    "enabled": true,
+    "id": "wiki-season-珍珠季-1022",
+    "type": "season",
+    "title": "【季节】珍珠季",
+    "start": "2026-10-22T04:00:00.000Z",
+    "end": "2026-01-13T04:00:00.000Z",
+    "source": "wiki",
+    "wikiUrl": "https://wiki.biligame.com/sky/%E7%8F%8D%E7%8F%A0%E5%AD%A3",
+    "_source": "wiki"
+  },
+  {
+    "enabled": true,
+    "id": "wiki-activity-2026年恶作剧之日-1024",
+    "type": "activity",
+    "title": "【活动】恶作剧之日",
+    "start": "2026-10-24T04:00:00.000Z",
+    "end": "2026-11-13T04:00:00.000Z",
+    "source": "wiki",
+    "wikiUrl": "https://wiki.biligame.com/sky/2026%E5%B9%B4%E6%81%B6%E4%BD%9C%E5%89%A7%E4%B9%8B%E6%97%A5",
+    "_source": "wiki"
+  },
+  {
+    "enabled": true,
+    "id": "wiki-activity-[[网易云音乐联动第三期|]]-1114",
+    "type": "activity",
+    "title": "【活动】[[网易云音乐联动 第三期|]]",
+    "start": "2026-11-14T04:00:00.000Z",
+    "end": "2026-11-27T04:00:00.000Z",
+    "source": "wiki",
+    "wikiUrl": "https://wiki.biligame.com/sky/活动日历",
+    "_source": "wiki"
+  },
+  {
+    "enabled": true,
+    "id": "bonus-6af3e84318a5e875e214303e-gzsej4",
+    "type": "bonus",
+    "title": "【双倍】双倍心火",
+    "start": "2026-11-13T16:00:00.000Z",
+    "end": "2026-11-20T15:59:00.000Z",
+    "sourceFeedId": "6af3e84318a5e875e214303e",
+    "_source": "netease"
+  },
+  {
+    "enabled": true,
+    "id": "bonus-6aeaadc31652f12cda87dd14-q7yu04",
+    "type": "bonus",
+    "title": "【双倍】双十一魔法商店活动公告",
+    "start": "2026-11-06T16:00:00.000Z",
+    "end": "2026-11-13T15:59:00.000Z",
+    "sourceFeedId": "6aeaadc31652f12cda87dd14",
+    "_source": "netease"
+  },
+  {
+    "enabled": true,
+    "id": "bonus-6a36104746804c0398433bec-11n995a",
+    "sourceFeedId": "6a36104746804c0398433bec",
+    "type": "bonus",
+    "title": "【双倍爱心】双倍爱心",
+    "start": "2026-06-20T16:00:00.000Z",
+    "end": "2026-06-27T15:59:00.000Z",
+    "_source": "manual"
+  },
+  {
+    "enabled": false,
+    "id": "maintenance-6a3baaa386a1b0305c4e30cf-11xqz2r",
+    "type": "maintenance",
+    "title": "【维护】维护更新",
+    "start": "2026-06-25T16:00:00.000Z",
+    "end": "2026-06-26T16:00:00.000Z",
+    "sourceFeedId": "6a3baaa386a1b0305c4e30cf",
+    "_source": "manual"
+  }
+]
