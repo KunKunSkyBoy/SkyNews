@@ -1,9 +1,17 @@
 {
  "schema": 2,
- "generated_at": "2026-11-11T18:59:37Z",
- "updated": "2026-11-11T18:59:37Z",
+ "generated_at": "2026-11-11T19:01:17Z",
+ "updated": "2026-11-11T19:01:17Z",
  "count": 55,
  "sources": {
+  "bili": {
+   "ok": false,
+   "count": 13,
+   "error": "NotConfigured: CI 跳过 B 站（海外 IP 412 风控）；App 本地抓，或设 SKYNEWS_BILI_CI=1 强制",
+   "elapsed_ms": 0,
+   "last_success": "2026-11-11T16:36:31Z",
+   "stale": true
+  },
   "douyin": {
    "ok": false,
    "count": 0,
@@ -18,79 +26,61 @@
    "elapsed_ms": 0,
    "last_success": null
   },
-  "bili": {
-   "ok": false,
-   "count": 13,
-   "error": "NotConfigured: CI 跳过 B 站（海外 IP 412 风控）；App 本地抓，或设 SKYNEWS_BILI_CI=1 强制",
-   "elapsed_ms": 0,
-   "last_success": "2026-11-11T16:36:31Z",
-   "stale": true
-  },
   "daily": {
    "ok": true,
    "count": 1,
    "error": null,
-   "elapsed_ms": 820,
-   "last_success": "2026-11-11T18:59:20Z"
+   "elapsed_ms": 665,
+   "last_success": "2026-11-11T19:00:56Z"
   },
   "official": {
    "ok": true,
    "count": 30,
    "error": null,
-   "elapsed_ms": 874,
-   "last_success": "2026-11-11T18:59:20Z"
+   "elapsed_ms": 1274,
+   "last_success": "2026-11-11T19:00:56Z"
   },
   "taptap": {
    "ok": true,
    "count": 10,
    "error": null,
-   "elapsed_ms": 1763,
-   "last_success": "2026-11-11T18:59:21Z"
+   "elapsed_ms": 1499,
+   "last_success": "2026-11-11T19:00:57Z"
   },
   "weibo": {
    "ok": false,
    "count": 0,
    "error": "NotConfigured: 未配置 WEIBO_COOKIE/RSSHUB_BASE，公开时间线不可用（公开时间线不可用：JSON 解析失败: Expecting value: line 1 column 1 (char 0)）",
-   "elapsed_ms": 10158,
+   "elapsed_ms": 13777,
    "last_success": null
   },
   "extra": {
-   "ok": true,
+   "ok": false,
    "count": 1,
-   "error": null,
-   "elapsed_ms": 11412,
-   "last_success": "2026-11-11T18:59:31Z"
+   "error": "RuntimeError: 速览数据为空（重试 3 次）",
+   "elapsed_ms": 14047,
+   "last_success": "2026-11-11T18:59:31Z",
+   "stale": true
   }
  },
  "problems": [
   "B站: NotConfigured: CI 跳过 B 站（海外 IP 412 风控）；App 本地抓，或设 SKYNEWS_BILI_CI=1 强制",
   "抖音: NotConfigured: 未配置 RSSHUB_BASE / SKYNEWS_DOUYIN_ROUTE",
+  "速览: RuntimeError: 速览数据为空（重试 3 次）",
   "微博: NotConfigured: 未配置 WEIBO_COOKIE/RSSHUB_BASE，公开时间线不可用（公开时间线不可用：JSON 解析失败: Expecting value: line 1 column 1 (char 0)）",
   "小红书: NotConfigured: 未配置 RSSHUB_BASE / SKYNEWS_XHS_ROUTE"
  ],
  "items": [
   {
-   "id": "extra-20261112",
-   "source": "extra",
-   "title": "11月12日 光遇速览",
-   "url": "https://www.ovoav.com/",
-   "time": "2026-11-11T18:59:31Z",
-   "summary": "季节蜡烛：霞谷2 大蜡烛：云野1 今日免费魔法：漂浮魔法 季剩余时间：62天20时59分30秒 有季卡完全毕业：62天 季节毕业所需：371季蜡",
-   "src": "速览",
-   "ts": 1794423571,
-   "t": "11-11 18:59",
-   "text": "11月12日 光遇速览\n季节蜡烛：霞谷2 大蜡烛：云野1 今日免费魔法：漂浮魔法 季剩余时间：62天20时59分30秒 有季卡完全毕业：62天 季节毕业所需：371季蜡"
-  },
-  {
    "id": "daily-20261112",
    "source": "daily",
    "title": "11月12日 每日任务",
    "url": "https://skydaily.nankki.com/",
-   "time": "2026-11-11T18:59:20Z",
+   "time": "2026-11-11T19:00:56Z",
    "summary": "今日每日任务： 1. 拾起一只螃蟹 2. 向一位玩家鞠躬 3. 在水母上回复能量 4. 向一位朋友招手 每日大蜡烛位置：在遇境/云巢里传送门门口处，若有两根小蜡烛在两边，即表示对应的地图里会有大蜡烛堆~ 今日无碎片降落",
    "src": "每日任务",
-   "ts": 1794423560,
-   "t": "11-11 18:59",
+   "ts": 1794423656,
+   "t": "11-11 19:00",
    "text": "11月12日 每日任务\n今日每日任务： 1. 拾起一只螃蟹 2. 向一位玩家鞠躬 3. 在水母上回复能量 4. 向一位朋友招手 每日大蜡烛位置：在遇境/云巢里传送门门口处，若有两根小蜡烛在两边，即表示对应的地图里会有大蜡烛堆~ 今日无碎片降落"
   },
   {
@@ -572,6 +562,19 @@
    "ts": 1786377600,
    "t": "08-10 16:00",
    "text": "星光璀璨 狂欢成戏｜《光·遇》奇妙之旅：狂欢季同人创作分享\n\n_ 光遇手游官网-光是遇见就很美好\n\n您使用的浏览器版本过低，可能会影响到您浏览本网页，建议您升级您的浏览器。\n\n光遇手游官网-光遇安卓官服下载 邀约好友迎新春\n光遇手游官网-光遇安卓官服下载 邀约好友迎新春\n光是遇见，就很美好\n\n首页 ·\nPC端指引 ·\n云国资讯 ·\n\n最新\n新闻\n公告\n活动\n采访\n\n博物馆 ·\n\n王国纪年\n视听珍藏\n心意礼赠\n创作者追光计划\n\n创作珍藏 ·\n与光同行 ·\n\n绘梦成真\n守望自然\n公益倡导\n行动回顾\n\n用户中心\n\n官方微博\n\n光遇手游\n\n官方公众号\n\n光遇手游\n\n星光璀璨 狂欢成戏｜《光·遇》奇妙之旅：狂欢季同人创作分享\n返回\n\n2026-08-11\n\n       由网易游戏代理的《光·遇》，凭借清新唯美的美术画面和创新独特的游戏玩法，荣膺“2020 Google Play 年度最具创新力游戏”奖项和“2023 Gamescom 最佳移动游戏”！《光·遇》奇妙之旅：狂欢季 创作征集活动圆满结束，小光收集了优秀的同人作品与大家分享~\n\n       霓虹点亮夜空，舞步旋起热浪，欢笑回荡云端，回忆凝作星光。旅人们用绘画、视频等形式，共同定格携手游乐的趣味时刻，查看下方视频，一起重温这些热情洋溢的瞬间，珍藏每一份创意与美好吧~\n\n联系我们\n\n       非常感谢旅人们对《光·遇》的喜爱与支持，在《光·遇》攻克各种困难的努力下，《光·遇》于2022年1月6日实现安卓和iOS合服，相遇在同一片天空下、于2024年12月6日上线电脑版，相遇在更广阔的天空下。光是遇见，就很美好。\n\n　　更多关于《光·遇》的制作人故事及最新游戏资讯，请持续关注——\n\n      - 《光·遇》官方网站： https://sky.163.com\n\n      - 《光·遇》官方微博：光遇手游\n\n      - 《光·遇》微信公众号：光遇手游\n\n      - 《光·遇》官方抖音：光遇手游\n\n      - 《光·遇》官方快手：光遇手游\n\n      - 《光·遇》官方B站：光遇手游\n\n      - 《光·遇》官方小红书：光·遇\n\n      - 《光·遇》官方大神：Sky光遇"
+  },
+  {
+   "id": "extra-20261112",
+   "source": "extra",
+   "title": "11月12日 光遇速览",
+   "url": "https://www.ovoav.com/",
+   "time": "2026-11-11T18:59:31Z",
+   "summary": "季节蜡烛：霞谷2 大蜡烛：云野1 今日免费魔法：漂浮魔法 季剩余时间：62天20时59分30秒 有季卡完全毕业：62天 季节毕业所需：371季蜡",
+   "src": "速览",
+   "ts": 1794423571,
+   "t": "11-11 18:59",
+   "text": "11月12日 光遇速览\n季节蜡烛：霞谷2 大蜡烛：云野1 今日免费魔法：漂浮魔法 季剩余时间：62天20时59分30秒 有季卡完全毕业：62天 季节毕业所需：371季蜡",
+   "stale": true
   },
   {
    "id": "bl-1269446754812559385",
