@@ -113,7 +113,7 @@ jobs:
           git config user.name "skynews-relay"
           git config user.email "relay@users.noreply.github.com"
           # 只跟踪 feed 产物（避免 docs 目录下其它文件被误提交）
-          git add docs/feed.json docs/feed.xml docs/tools.html docs/.tools-date docs/history
+          git add docs/feed.json docs/feed.xml docs/tools.html docs/.tools-date docs/history docs/calendar.ics relay/data/events.json
           if git diff --cached --quiet; then
             echo "无内容变化，跳过提交"
             exit 0
