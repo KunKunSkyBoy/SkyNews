@@ -20,7 +20,9 @@
   python3 relay.py --out docs --no-cache  # 不用上次结果做失败回退
 """
 import argparse
+import base64
 import hashlib
+import html as html_mod
 import html
 import json
 import os
@@ -1041,6 +1043,201 @@ def self_test():
 
 
 # ============================================================ main
+
+
+def _gh_api(method, url, data=None, ctype=None):
+    token = (os.environ.get("GITHUB_TOKEN") or os.environ.get("SKYNEWS_GH_TOKEN") or "").strip()
+    if not token:
+        return 0, b""
+    req = urllib.request.Request(url, data=data, method=method, headers={
+        "Authorization": "Bearer " + token, "User-Agent": "skynews-relay",
+        "Accept": "application/vnd.github+json",
+    })
+    if data is not None and ctype:
+        req.add_header("Content-Type", ctype)
+    try:
+        with urllib.request.urlopen(req, timeout=40) as r:
+            body = r.read()
+            try:
+                return r.status, json.loads(body.decode("utf-8"))
+            except Exception:  # noqa: BLE001
+                return r.status, body
+    except urllib.error.HTTPError as e:
+        return e.code, e.read()
+
+
+def _gh_repo():
+    return os.environ.get("GITHUB_REPOSITORY") or "KunKunSkyBoy/SkyNews"
+
+
+def _tools_release():
+    st, d = _gh_api("GET", "https://api.github.com/repos/%s/releases/tags/skytools" % _gh_repo())
+    if st == 200 and isinstance(d, dict):
+        return d
+    payload = json.dumps({
+        "tag_name": "skytools", "name": "SkyNews 工具图片",
+        "body": "CI 自动更新的光遇工具图片（季蜡/大蜡/复刻/日历）",
+        "prerelease": True}, ensure_ascii=False).encode()
+    st, d = _gh_api("POST", "https://api.github.com/repos/%s/releases" % _gh_repo(),
+                    payload, "application/json")
+    return d if st in (200, 201) and isinstance(d, dict) else None
+
+
+def _upload_release_image(name, raw):
+    """把图片上传到 GitHub Release（不进 git 历史），返回可直接访问的 URL。"""
+    rel = _tools_release()
+    if not rel:
+        return ""
+    rid = rel.get("id")
+    if not rid:
+        return ""
+    for a in rel.get("assets") or []:
+        if a.get("name") == name:
+            _gh_api("DELETE", "https://api.github.com/repos/%s/releases/assets/%d"
+                    % (_gh_repo(), a.get("id")))
+    if raw[:3] == b"\xff\xd8\xff":
+        ctype = "image/jpeg"
+    elif raw[:4] == b"GIF8":
+        ctype = "image/gif"
+    else:
+        ctype = "image/png"
+    st, up = _gh_api("POST", "https://uploads.github.com/repos/%s/releases/%s/assets?name=%s"
+                     % (_gh_repo(), rid, name), raw, ctype)
+    if st in (200, 201) and isinstance(up, dict):
+        return up.get("browser_download_url") or ""
+    return ""
+
+
+def _img_src(raw, name):
+    """优先上传到 Release 得到 URL；失败才内嵌 data URI（避免仓库变大）。"""
+    url = _upload_release_image(name, raw)
+    return url if url else _data_uri(raw)
+
+
+def http_get_bytes(url, referer=None, timeout=None):
+    """GET 二进制（图片等）。"""
+    req = urllib.request.Request(url, headers={
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
+        "Accept": "*/*",
+        "Accept-Encoding": "identity",
+    })
+    if referer:
+        req.add_header("Referer", referer)
+    with urllib.request.urlopen(req, timeout=timeout or DEFAULT_TIMEOUT) as r:
+        return r.read()
+
+
+def _data_uri(raw):
+    if raw[:3] == b"\xff\xd8\xff":
+        mime = "image/jpeg"
+    elif raw[:8] == b"\x89PNG\r\n\x1a\n":
+        mime = "image/png"
+    elif raw[:4] == b"GIF8":
+        mime = "image/gif"
+    else:
+        mime = "image/png"
+    return "data:%s;base64,%s" % (mime, base64.b64encode(raw).decode())
+
+
+def _t1qq_img(ep, key):
+    try:
+        raw = http_get_bytes("https://api.t1qq.com/api/sky/sc/%s?key=%s"
+                             % (ep, urllib.parse.quote(key)), referer="https://api.t1qq.com/")
+        if len(raw) > 512 and raw[:2] in (b"\xff\xd8", b"\x89P", b"GI"):
+            return _img_src(raw, "sc_" + ep + ".png")
+    except Exception:  # noqa: BLE001
+        pass
+    return ""
+
+
+def write_tools_html(out_dir, data):
+    """生成 docs/tools.html：所有免费光遇工具（文字 + 图片），按天缓存。"""
+    key = (os.environ.get("SKYNEWS_T1QQ_KEY") or "").strip()
+    if not key:
+        return
+    today = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d")
+    marker = os.path.join(out_dir, ".tools-date")
+    try:
+        if os.path.exists(marker) and io.open(marker, encoding="utf-8").read().strip() == today:
+            return
+    except Exception:  # noqa: BLE001
+        pass
+
+    items = data.get("items") or []
+    by_src = {}
+    for it in items:
+        by_src.setdefault(it.get("src") or it.get("source") or "", it)
+
+    def text_of(name):
+        it = by_src.get(name)
+        if not it:
+            return ""
+        return html_mod.escape(it.get("text") or "").replace("\n", "<br/>")
+
+    sections = []
+    daily_t = text_of("每日任务")
+    extra_t = text_of("速览")
+    if daily_t:
+        sections.append(("daily", "每日任务", daily_t, []))
+    if extra_t:
+        sections.append(("extra", "今日速览（季蜡/大蜡/魔法/赛季）", extra_t, []))
+    # 红石天气图片（keyless URL）
+    gytq_imgs = []
+    try:
+        d = http_get_json("https://api.t1qq.com/api/sky/gytq?key=" + urllib.parse.quote(key),
+                          referer="https://api.t1qq.com/")
+        for u in (d.get("data") or [])[:2]:
+            if u.startswith("http"):
+                try:
+                    gytq_imgs.append(_img_src(http_get_bytes(u), "gytq_%d.png" % len(gytq_imgs)))
+                except Exception:  # noqa: BLE001
+                    pass
+    except Exception:  # noqa: BLE001
+        pass
+    sections.append(("gytq", "红石/黑石天气", "来自应天API 的天气图（每日更新）", gytq_imgs))
+    # 图片类
+    for ep, title in [("scjl", "季节蜡烛位置图"), ("scdl", "大蜡烛位置图"),
+                      ("scfk", "复刻先祖位置图"), ("hdrl", "活动日历图")]:
+        uri = _t1qq_img(ep, key)
+        if uri:
+            sections.append((ep, title, "", [uri]))
+
+    parts = []
+    for sid, title, text, imgs in sections:
+        img_html = "".join('<div class="imgwrap"><img src="%s"/></div>' % u for u in imgs)
+        parts.append('<section id="%s"><h2>%s</h2><div class="txt">%s</div>%s</section>'
+                     % (sid, title, text, img_html))
+    page = """<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>光遇工具 · SkyNews</title>
+<style>
+body{margin:0;background:#0e141b;color:#dbe7f3;font-family:system-ui,-apple-system,"PingFang SC",sans-serif}
+header{padding:16px 18px;background:#111a24;position:sticky;top:0;border-bottom:1px solid #1e2a38;z-index:2}
+h1{font-size:18px;margin:0 0 4px}
+.meta{font-size:12px;color:#7f93a8}
+nav{display:flex;flex-wrap:wrap;gap:6px;padding:10px 14px;background:#0b1118;border-bottom:1px solid #1e2a38}
+nav a{font-size:12px;color:#7bd8c4;text-decoration:none;border:1px solid #1e3a44;border-radius:8px;padding:5px 9px;background:#101c24}
+section{padding:14px 16px;border-bottom:1px solid #17222e}
+h2{font-size:15px;margin:0 0 8px;color:#9fd7ff}
+.txt{font-size:14px;line-height:1.7;color:#cfe0ef}
+.imgwrap{margin-top:10px;background:#fff;border-radius:10px;overflow:hidden}
+.imgwrap img{width:100%%;display:block}
+footer{padding:14px 16px;font-size:11px;color:#5f7286}
+</style></head><body>
+<header><h1>光遇工具 · SkyNews</h1><div class="meta">免费数据源：skydaily · 应天API · oivio ｜ 更新时间 %s</div></header>
+<nav>%s</nav>
+%s
+<footer>数据来自第三方公开接口，仅供参考；每日自动更新。</footer>
+</body></html>""" % (
+        datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M"),
+        "".join('<a href="#%s">%s</a>' % (sid, title) for sid, title, _, _ in sections),
+        "".join(parts),
+    )
+    atomic_write(os.path.join(out_dir, "tools.html"), page)
+    atomic_write(marker, today)
+    print("tools.html written (%d sections)" % len(sections))
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default="docs")
@@ -1073,6 +1270,10 @@ def main(argv=None):
     atomic_write(os.path.join(args.out, "feed.json"),
                  json.dumps(data, ensure_ascii=False, indent=1))
     atomic_write(os.path.join(args.out, "feed.xml"), to_rss(data))
+    try:
+        write_tools_html(args.out, data)
+    except Exception as e:  # noqa: BLE001
+        print("tools.html skipped:", e)
     if args.show:
         print_summary(data)
 
