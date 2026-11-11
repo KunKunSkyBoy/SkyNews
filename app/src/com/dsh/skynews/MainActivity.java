@@ -106,6 +106,9 @@ public class MainActivity extends Activity {
             C_BODY = 0xFFCBD5E8;
     static final int THEME_AUTO = 0, THEME_LIGHT = 1, THEME_DARK = 2;
 
+    /** 动态卡片默认预览字数；超过则显示「展开全文」（不再硬截断存储的正文）。 */
+    static final int CARD_PREVIEW_CHARS = 600;
+
     static int themeMode(Context c) {
         return pref(c).getInt("theme_mode", THEME_AUTO);
     }
@@ -145,6 +148,8 @@ public class MainActivity extends Activity {
     private EditText searchBar;
     private String searchQuery = "";
     private boolean favOnly = false;
+    /** 动态页里已原地展开全文的条目 id */
+    private final java.util.Set<String> expandedFeed = new java.util.HashSet<>();
 
     // ---- 资料页（assets/sky 静态数据）----
     private int skyCat = 0;
@@ -808,11 +813,24 @@ public class MainActivity extends Activity {
             card.addView(head);
 
             String fullText = o.optString("text", "");
-            String brief = fullText.length() > 600 ? fullText.substring(0, 600) + "…（点开看全文）" : fullText;
-            TextView body = tv(brief, 14, stale ? C_DIM : C_TEXT, false);
+            final boolean expandable = fullText.length() > CARD_PREVIEW_CHARS;
+            final boolean expanded = expandedFeed.contains(id);
+            String shown = expanded || !expandable ? fullText
+                    : fullText.substring(0, CARD_PREVIEW_CHARS).trim() + "\n…";
+            TextView body = tv(shown, 14, stale ? C_DIM : C_TEXT, false);
             body.setLineSpacing(dp(4), 1f);
             body.setPadding(0, dp(8), 0, 0);
             card.addView(body);
+            if (expandable) {
+                TextView toggle = tv(expanded ? "▲ 收起" : "▼ 展开全文（共 " + fullText.length() + " 字）",
+                        12, C_ACCENT, true);
+                toggle.setPadding(0, dp(6), 0, 0);
+                toggle.setOnClickListener(v -> {
+                    if (expanded) expandedFeed.remove(id); else expandedFeed.add(id);
+                    render();
+                });
+                card.addView(toggle);
+            }
 
             final String url = o.optString("url", "");
             final String itemTitle = o.optString("t", "");
@@ -897,6 +915,42 @@ public class MainActivity extends Activity {
     }
 
     /** 合并各源条目：按 id 去重、按 ts 倒序、最多保留 150 条。返回新增条数。 */
+    /** 公告正文规整：保留段落换行、压缩连续空行，**不截断**。 */
+    static String tidyBody(String s) {
+        if (s == null) return "";
+        String t = s.replace("\r\n", "\n").replace("\r", "\n").replace('\u3000', ' ');
+        t = t.replaceAll("[ \\t]+\\n", "\n").replaceAll("\\n{3,}", "\n\n");
+        return t.trim();
+    }
+
+    /** 清掉同一标题、旧版 id（正文被截断）的公告条目，避免重抓后同一条出现两份。 */
+    static void dropLegacyAnn(Context ctx, String title, String keepId) {
+        if (title == null || title.isEmpty()) return;
+        SharedPreferences sp = pref(ctx);
+        JSONArray old;
+        try {
+            old = new JSONArray(sp.getString("feed", "[]"));
+        } catch (Exception e) {
+            return;
+        }
+        JSONArray out = new JSONArray();
+        boolean changed = false;
+        for (int i = 0; i < old.length(); i++) {
+            JSONObject o = old.optJSONObject(i);
+            if (o == null) continue;
+            boolean legacy = o.optString("id", "").startsWith("ann-")
+                    && !keepId.equals(o.optString("id", ""))
+                    && "公告".equals(o.optString("src", ""))
+                    && o.optString("text", "").startsWith(title);
+            if (legacy) {
+                changed = true;
+                continue;
+            }
+            out.put(o);
+        }
+        if (changed) sp.edit().putString("feed", out.toString()).apply();
+    }
+
     static int mergeFeed(Context ctx, java.util.List<JSONObject> incoming) {
         SharedPreferences sp = pref(ctx);
         JSONArray old;
@@ -1120,14 +1174,16 @@ public class MainActivity extends Activity {
         // 4) 官网公告正文（与「公告」页同源，作为动态时间线里的一条）
         try {
             JSONObject o = parseLoose(ann);
-            String body = o.optString("NeteaseMessage", "").replace("\n", " ").trim();
-            if (body.length() > 140) body = body.substring(0, 140) + "…";
+            String annTitle = o.optString("Title", "").trim();
+            String body = tidyBody(o.optString("NeteaseMessage", ""));
+            String newId = "ann-" + sha256(annTitle);
+            dropLegacyAnn(ctx, annTitle, newId);   // 旧版把正文截到 140 字，重抓时清掉旧条目
             JSONObject it = new JSONObject();
-            it.put("id", "ann-" + sha256(o.optString("Title", "") + body));
+            it.put("id", newId);
             it.put("src", "公告");
             it.put("t", fmt.format(new Date()));
             it.put("ts", System.currentTimeMillis());
-            it.put("text", o.optString("Title", "") + "\n" + body);
+            it.put("text", annTitle + (body.isEmpty() ? "" : "\n\n" + body));
             it.put("url", "https://sky.163.com/news/");
             items.add(it);
         } catch (Exception e) {
@@ -1773,7 +1829,7 @@ public class MainActivity extends Activity {
         }
 
         content.addView(section("关于"));
-        content.addView(tv("SkyNews（光遇公告阅读器）v2.7 (9)", 13, C_TEXT, true));
+        content.addView(tv("SkyNews（光遇公告阅读器）v2.8 (10)", 13, C_TEXT, true));
         content.addView(tv("数据源：官方公告/新闻、TapTap、B站、云中继；抓取失败会保留旧条目（灰显）", 11, C_DIM, false));
         content.addView(tv("构建：无 Gradle（javac + aapt2 + d8 + apksigner）", 11, C_DIM, false));
 
@@ -2295,8 +2351,11 @@ public class MainActivity extends Activity {
             TextView close = barBtn("关闭");
             TextView copy = barBtn("复制链接");
             TextView browser = barBtn("浏览器打开");
+            TextView copyAll = barBtn("复制全文");
+            if (content == null || content.trim().isEmpty()) copyAll.setVisibility(android.view.View.GONE);
             bar.addView(close, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
             bar.addView(copy, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+            bar.addView(copyAll, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
             bar.addView(browser, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
             root.addView(bar);
 
@@ -2340,6 +2399,13 @@ public class MainActivity extends Activity {
                 } catch (Throwable e) {
                     Toast.makeText(this, "没有可用的浏览器", Toast.LENGTH_SHORT).show();
                 }
+            });
+            copyAll.setOnClickListener(v -> {
+                android.content.ClipboardManager cm =
+                        (android.content.ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                cm.setPrimaryClip(android.content.ClipData.newPlainText("content", content == null ? "" : content));
+                Toast.makeText(this, "已复制全文（" + (content == null ? 0 : content.length()) + " 字）",
+                        Toast.LENGTH_SHORT).show();
             });
             if (content != null && !content.trim().isEmpty()) {
                 String html = android.text.TextUtils.htmlEncode(content).replace("\n", "<br/>");
@@ -2523,15 +2589,22 @@ public class MainActivity extends Activity {
         }
     }
 
-    /** 点卡片：有正文 → 阅读页显示全文（可再跳浏览器）；没有正文才直接开链接 */
+    /** 点卡片：正文是可读文本 → 阅读页显示全文；正文是原始 JSON/无正文 → 用内置网页阅读 */
     private void openItem(String url, String title, String text) {
-        if (text != null && !text.trim().isEmpty()) {
+        String t = text == null ? "" : text.trim();
+        boolean jsonLike = t.startsWith("{") || t.startsWith("[")
+                || t.contains("\"announcementMessage\"") || t.contains("\"oppoMessage\"")
+                || t.contains("\"xiaomi_appMessage\"");
+        if (!t.isEmpty() && !jsonLike) {
             Intent i = new Intent(this, ReaderActivity.class);
-            i.putExtra("content", (title == null ? "" : title + "\n\n") + text);
+            i.putExtra("content", (title == null ? "" : title + "\n\n") + t);
             i.putExtra("url", url == null ? "" : url);
             startActivity(i);
-        } else if (url != null && !url.isEmpty()) {
-            open(url);
+        } else if (url != null && url.startsWith("http")) {
+            Intent i = new Intent(this, ReaderActivity.class);
+            i.putExtra("content", "");
+            i.putExtra("url", url);
+            startActivity(i);
         } else {
             toast("没有可打开的内容");
         }
