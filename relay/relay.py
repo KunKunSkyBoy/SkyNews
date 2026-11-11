@@ -456,38 +456,74 @@ def _collect_daily_strings(obj, out, depth=0):
             out.append(t)
 
 
-def src_daily():
-    """光遇每日任务（免费公共 API：skydaily.nankki.com，无需密钥）。"""
-    d = http_get_json("https://skydaily.nankki.com/v1/daily",
-                      referer="https://skydaily.nankki.com/")
-    data = d.get("data") or {}
-    tasks = data.get("tasks") or []
+def _daily_from_oivio():
+    """备用源：oivio-up/SkyDailyInfo 的公开 data.json（免费、无需密钥）。"""
+    d = http_get_json("https://oivio-up.github.io/SkyDailyInfo/data.json",
+                      referer="https://oivio-up.github.io/SkyDailyInfo/")
+    tasks = d.get("tasks") or []
     if not tasks:
-        raise RuntimeError("每日任务接口返回为空")
-    date = d.get("date") or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        raise RuntimeError("oivio 备用源无任务")
     lines = []
     for i, t in enumerate(tasks[:8]):
         txt = (t.get("text") or "").strip()
         if txt:
             lines.append("%d. %s" % (t.get("number") or (i + 1), txt))
     body = "今日每日任务：\n" + "\n".join(lines)
-    # 大蜡烛 / 季蜡 提示
+    weather = (d.get("weather") or {}).get("text") or ""
+    if weather:
+        body += "\n" + weather.strip()
+    date = (d.get("date") or "").strip()
+    return date, body
+
+
+def src_daily():
+    """光遇每日任务（主：skydaily.nankki.com 免费 API；备：oivio 公开 data.json）。"""
+    date, body = "", ""
+    last_err = None
     try:
-        c = http_get_json("https://skydaily.nankki.com/v1/daily/candles",
+        d = http_get_json("https://skydaily.nankki.com/v1/daily",
                           referer="https://skydaily.nankki.com/")
-        for e in (c.get("data") or [])[:4]:
-            title = (e.get("title") or "").strip()
-            txt = (e.get("text") or "").strip()
-            if title and txt:
-                body += "\n" + title + "：" + txt.split("\n")[0][:120]
-    except Exception:  # noqa: BLE001
-        pass
-    ts = None  # 用当前时间，避免按未来日期排序跑到最前
+        data = d.get("data") or {}
+        tasks = data.get("tasks") or []
+        if tasks:
+            date = d.get("date") or ""
+            lines = []
+            for i, t in enumerate(tasks[:8]):
+                txt = (t.get("text") or "").strip()
+                if txt:
+                    lines.append("%d. %s" % (t.get("number") or (i + 1), txt))
+            body = "今日每日任务：\n" + "\n".join(lines)
+            try:
+                c = http_get_json("https://skydaily.nankki.com/v1/daily/candles",
+                                  referer="https://skydaily.nankki.com/")
+                for e in (c.get("data") or [])[:4]:
+                    title = (e.get("title") or "").strip()
+                    txt = (e.get("text") or "").strip()
+                    if title and txt:
+                        body += "\n" + title + "：" + txt.split("\n")[0][:120]
+            except Exception:  # noqa: BLE001
+                pass
+            try:
+                w = http_get_json("https://skydaily.nankki.com/v1/daily/weather",
+                                  referer="https://skydaily.nankki.com/")
+                wt = ((w.get("data") or {}) if isinstance(w.get("data"), dict) else {}).get("text") or ""
+                if wt:
+                    body += "\n" + wt.strip()
+            except Exception:  # noqa: BLE001
+                pass
+        else:
+            raise RuntimeError("skydaily 返回空任务")
+    except Exception as e:  # noqa: BLE001
+        last_err = e
+        try:
+            date, body = _daily_from_oivio()
+        except Exception as e2:  # noqa: BLE001
+            raise RuntimeError("每日任务主/备源均失败：%s / %s" % (last_err, e2))
+
     parts = date.split("-")
-    label = ("%s月%s日" % (parts[1], parts[2])) if len(parts) == 3 else date
-    return [make_item("daily-" + date.replace("-", ""), "daily",
-                      label + " 每日任务",
-                      "https://skydaily.nankki.com/", ts, body)]
+    label = ("%s月%s日" % (parts[1], parts[2])) if len(parts) == 3 else (date or "今日")
+    return [make_item("daily-" + (date or "today").replace("-", ""), "daily",
+                      label + " 每日任务", "https://skydaily.nankki.com/", None, body)]
 
 
 
