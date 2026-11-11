@@ -1,7 +1,7 @@
 {
  "schema": 2,
- "generated_at": "2026-11-11T18:55:50Z",
- "updated": "2026-11-11T18:55:50Z",
+ "generated_at": "2026-11-11T18:59:37Z",
+ "updated": "2026-11-11T18:59:37Z",
  "count": 55,
  "sources": {
   "douyin": {
@@ -30,36 +30,36 @@
    "ok": true,
    "count": 1,
    "error": null,
-   "elapsed_ms": 804,
-   "last_success": "2026-11-11T18:55:32Z"
+   "elapsed_ms": 820,
+   "last_success": "2026-11-11T18:59:20Z"
   },
   "official": {
    "ok": true,
    "count": 30,
    "error": null,
-   "elapsed_ms": 1100,
-   "last_success": "2026-11-11T18:55:32Z"
+   "elapsed_ms": 874,
+   "last_success": "2026-11-11T18:59:20Z"
   },
   "taptap": {
    "ok": true,
    "count": 10,
    "error": null,
-   "elapsed_ms": 1455,
-   "last_success": "2026-11-11T18:55:32Z"
-  },
-  "extra": {
-   "ok": true,
-   "count": 1,
-   "error": null,
-   "elapsed_ms": 5087,
-   "last_success": "2026-11-11T18:55:36Z"
+   "elapsed_ms": 1763,
+   "last_success": "2026-11-11T18:59:21Z"
   },
   "weibo": {
    "ok": false,
    "count": 0,
    "error": "NotConfigured: 未配置 WEIBO_COOKIE/RSSHUB_BASE，公开时间线不可用（公开时间线不可用：JSON 解析失败: Expecting value: line 1 column 1 (char 0)）",
-   "elapsed_ms": 12359,
+   "elapsed_ms": 10158,
    "last_success": null
+  },
+  "extra": {
+   "ok": true,
+   "count": 1,
+   "error": null,
+   "elapsed_ms": 11412,
+   "last_success": "2026-11-11T18:59:31Z"
   }
  },
  "problems": [
@@ -74,23 +74,23 @@
    "source": "extra",
    "title": "11月12日 光遇速览",
    "url": "https://www.ovoav.com/",
-   "time": "2026-11-11T18:55:36Z",
-   "summary": "季节蜡烛：霞谷2 大蜡烛：云野1 今日免费魔法：漂浮魔法 季剩余时间：62天21时3分24秒 有季卡完全毕业：62天 季节毕业所需：371季蜡",
+   "time": "2026-11-11T18:59:31Z",
+   "summary": "季节蜡烛：霞谷2 大蜡烛：云野1 今日免费魔法：漂浮魔法 季剩余时间：62天20时59分30秒 有季卡完全毕业：62天 季节毕业所需：371季蜡",
    "src": "速览",
-   "ts": 1794423336,
-   "t": "11-11 18:55",
-   "text": "11月12日 光遇速览\n季节蜡烛：霞谷2 大蜡烛：云野1 今日免费魔法：漂浮魔法 季剩余时间：62天21时3分24秒 有季卡完全毕业：62天 季节毕业所需：371季蜡"
+   "ts": 1794423571,
+   "t": "11-11 18:59",
+   "text": "11月12日 光遇速览\n季节蜡烛：霞谷2 大蜡烛：云野1 今日免费魔法：漂浮魔法 季剩余时间：62天20时59分30秒 有季卡完全毕业：62天 季节毕业所需：371季蜡"
   },
   {
    "id": "daily-20261112",
    "source": "daily",
    "title": "11月12日 每日任务",
    "url": "https://skydaily.nankki.com/",
-   "time": "2026-11-11T18:55:32Z",
+   "time": "2026-11-11T18:59:20Z",
    "summary": "今日每日任务： 1. 拾起一只螃蟹 2. 向一位玩家鞠躬 3. 在水母上回复能量 4. 向一位朋友招手 每日大蜡烛位置：在遇境/云巢里传送门门口处，若有两根小蜡烛在两边，即表示对应的地图里会有大蜡烛堆~ 今日无碎片降落",
    "src": "每日任务",
-   "ts": 1794423332,
-   "t": "11-11 18:55",
+   "ts": 1794423560,
+   "t": "11-11 18:59",
    "text": "11月12日 每日任务\n今日每日任务： 1. 拾起一只螃蟹 2. 向一位玩家鞠躬 3. 在水母上回复能量 4. 向一位朋友招手 每日大蜡烛位置：在遇境/云巢里传送门门口处，若有两根小蜡烛在两边，即表示对应的地图里会有大蜡烛堆~ 今日无碎片降落"
   },
   {
