@@ -555,50 +555,198 @@ def src_extra():
 
 
 
-def _ics_upcoming(days=10, limit=6):
-    """从 sky-ics.pages.dev 的 ICS 日历里取未来事件（红石/活动/复刻，免费无需 key）。"""
-    url = ("https://sky-ics.pages.dev/calendar.ics?types=red,traveling_spirit,season,activity"
-           "&endOnly=traveling_spirit,season,activity")
-    txt = http_get_bytes(url, referer="https://sky-ics.pages.dev/").decode("utf-8", "replace")
-    txt = txt.replace("\r\n", "\n").replace("\r", "\n")
-    # 处理 ICS 折行（续行以空格/tab 开头）
-    lines = []
-    for ln in txt.split("\n"):
-        if ln.startswith((" ", "\t")) and lines:
-            lines[-1] += ln[1:]
-        else:
-            lines.append(ln)
-    events = []
-    cur = None
-    for ln in lines:
-        if ln == "BEGIN:VEVENT":
-            cur = {}
-        elif ln == "END:VEVENT":
-            if cur:
-                events.append(cur)
-            cur = None
-        elif cur is not None and ":" in ln:
-            k, v = ln.split(":", 1)
-            k = k.split(";")[0]
-            cur[k] = v
-    now = datetime.now(timezone.utc)
-    out = []
-    for ev in events:
-        ds = (ev.get("DTSTART") or "").strip()
+STONE_CONFIG = {
+    "slots": {2: [(9, 8), (14, 8), (19, 8)], 3: [(9, 8), (15, 8), (21, 8)],
+              5: [(11, 8), (17, 8), (23, 8)], 6: [(10, 8), (14, 8), (22, 8)],
+              0: [(7, 8), (13, 8), (19, 8)]},
+    "maps": ["霞谷", "暮土", "禁阁", "云野", "雨林"],
+    "areas": {
+        "霞谷": {2: "滑冰场", 3: "滑冰场", 5: "圆梦村", 6: "圆梦村", 0: "雪隐峰"},
+        "暮土": {2: "边陲荒漠", 3: "远古战场", 5: "黑水港湾", 6: "巨兽荒原", 0: "失落方舟"},
+        "禁阁": {2: "星光沙漠", 3: "星光沙漠", 5: "商船星球", 6: "商船星球", 0: "商船星球"},
+        "云野": {2: "蝴蝶平原", 3: "仙乡", 5: "云顶浮石", 6: "幽光山洞", 0: "圣岛"},
+        "雨林": {2: "荧光森林", 3: "密林遗迹", 5: "大树屋", 6: "雨林神殿", 0: "秘密花园"},
+    },
+    "red": {"first": (6, 0), "second": (5, 0)},
+    "black": {"first": (2,), "second": (3,)},
+    "boundary": 15,
+}
+TZ8 = timezone(timedelta(hours=8))
+
+
+def _events_snapshot_path():
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "events.json")
+
+
+def _github_json(path):
+    """用 GITHUB_TOKEN 从 mo-sky-stones 数据仓同步 events.json（自建用数据快照）。"""
+    tok = (os.environ.get("GITHUB_TOKEN") or os.environ.get("SKYNEWS_GH_TOKEN") or "").strip()
+    if not tok:
+        return None
+    try:
+        req = urllib.request.Request(
+            "https://api.github.com/repos/mosyoyo/mo-sky-stones/contents/" + path,
+            headers={"Authorization": "Bearer " + tok, "User-Agent": "skynews-relay",
+                     "Accept": "application/vnd.github+json"})
+        with urllib.request.urlopen(req, timeout=20) as r:
+            d = json.loads(r.read().decode("utf-8"))
+        return base64.b64decode(d.get("content") or "").decode("utf-8", "replace")
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _load_events():
+    """读取社区活动/复刻数据快照；有 token 时同步最新到 relay/data/events.json。"""
+    raw = _github_json("data/events.json")
+    local = _events_snapshot_path()
+    if raw:
         try:
-            dt = datetime.strptime(ds, "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc)
+            new = json.loads(raw)
+            if isinstance(new, list) and new:
+                cur = ""
+                if os.path.exists(local):
+                    cur = io.open(local, encoding="utf-8").read()
+                if raw != cur:
+                    os.makedirs(os.path.dirname(local), exist_ok=True)
+                    atomic_write(local, raw)
+                return new
+        except Exception:  # noqa: BLE001
+            pass
+    try:
+        if os.path.exists(local):
+            d = json.loads(io.open(local, encoding="utf-8").read())
+            if isinstance(d, list):
+                return d
+    except Exception:  # noqa: BLE001
+        pass
+    return []
+
+
+def _calendar_entries(days=10, limit=8):
+    """自建日历：红石/黑石时间 + 活动/复刻结束时间（北京时区）。"""
+    now = datetime.now(TZ8)
+    out = []
+    for i in range(days + 1):
+        d = (now + timedelta(days=i)).date()
+        dow = (d.weekday() + 1) % 7  # 0=周日
+        first = d.day <= STONE_CONFIG["boundary"]
+        typ = None
+        if first:
+            if dow in STONE_CONFIG["red"]["first"]:
+                typ = "red"
+            elif dow in STONE_CONFIG["black"]["first"]:
+                typ = "black"
+        else:
+            if dow in STONE_CONFIG["red"]["second"]:
+                typ = "red"
+            elif dow in STONE_CONFIG["black"]["second"]:
+                typ = "black"
+        if typ:
+            mp = STONE_CONFIG["maps"][d.day % 5]
+            area = STONE_CONFIG["areas"].get(mp, {}).get(dow, "")
+            for (hh, mm) in STONE_CONFIG["slots"].get(dow, []):
+                dt = datetime(d.year, d.month, d.day, hh, mm, tzinfo=TZ8)
+                name = "红石" if typ == "red" else "黑石"
+                out.append((dt, "%d月%d日 %02d:%02d 【%s】%s·%s"
+                            % (d.month, d.day, hh, mm, name, mp, area)))
+    # 活动/复刻（只列结束提醒）
+    for ev in _load_events():
+        if not ev.get("enabled", True):
+            continue
+        et = (ev.get("type") or "").strip()
+        if et not in ("traveling_spirit", "season", "activity", "bonus"):
+            continue
+        end = (ev.get("end") or "").strip()
+        try:
+            dt = datetime.strptime(end.replace("Z", "+0000")[:19].replace("T", " "),
+                                   "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc).astimezone(TZ8)
         except Exception:  # noqa: BLE001
             continue
-        if dt < now - timedelta(hours=2) or dt > now + timedelta(days=days):
+        if dt < now or dt > now + timedelta(days=days):
             continue
-        title = (ev.get("SUMMARY") or "").strip()
-        loc = (ev.get("LOCATION") or "").strip()
-        bj = dt + timedelta(hours=8)
-        out.append((dt, "%d月%d日 %02d:%02d %s%s" % (
-            bj.month, bj.day, bj.hour, bj.minute, title,
-            ("（" + loc + "）") if loc and loc not in title else "")))
+        title = (ev.get("title") or "").strip()
+        if not title:
+            continue
+        out.append((dt, "%d月%d日 %02d:%02d 【结束】%s"
+                    % (dt.month, dt.day, dt.hour, dt.minute, title.replace("【", "").replace("】", " ").strip())))
     out.sort(key=lambda x: x[0])
-    return [x[1] for x in out[:limit]]
+    return out[:limit]
+
+
+def _ics_upcoming(days=10, limit=6):
+    """兼容旧接口：优先自建引擎，失败才回退 sky-ics。"""
+    try:
+        evs = _calendar_entries(days=days, limit=limit)
+        if evs:
+            return [e[1] for e in evs]
+    except Exception:  # noqa: BLE001
+        pass
+    # 回退：sky-ics 第三方
+    try:
+        url = ("https://sky-ics.pages.dev/calendar.ics?types=red,traveling_spirit,season,activity"
+               "&endOnly=traveling_spirit,season,activity")
+        txt = http_get_bytes(url, referer="https://sky-ics.pages.dev/").decode("utf-8", "replace")
+        txt = txt.replace("\r\n", "\n").replace("\r", "\n")
+        lines = []
+        for ln in txt.split("\n"):
+            if ln.startswith((" ", "\t")) and lines:
+                lines[-1] += ln[1:]
+            else:
+                lines.append(ln)
+        events = []
+        cur = None
+        for ln in lines:
+            if ln == "BEGIN:VEVENT":
+                cur = {}
+            elif ln == "END:VEVENT":
+                if cur:
+                    events.append(cur)
+                cur = None
+            elif cur is not None and ":" in ln:
+                k, v = ln.split(":", 1)
+                cur[k.split(";")[0]] = v
+        now = datetime.now(timezone.utc)
+        res = []
+        for ev in events:
+            ds = (ev.get("DTSTART") or "").strip()
+            try:
+                dt = datetime.strptime(ds, "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc)
+            except Exception:  # noqa: BLE001
+                continue
+            if dt < now - timedelta(hours=2) or dt > now + timedelta(days=days):
+                continue
+            bj = dt.astimezone(TZ8)
+            res.append((dt, "%d月%d日 %02d:%02d %s" % (bj.month, bj.day, bj.hour, bj.minute,
+                                                      (ev.get("SUMMARY") or "").strip())))
+        res.sort(key=lambda x: x[0])
+        return [x[1] for x in res[:limit]]
+    except Exception:  # noqa: BLE001
+        return []
+
+
+def write_calendar_ics(out_dir):
+    """生成我们自己的 docs/calendar.ics（可订阅，自建，不再依赖第三方页面）。"""
+    evs = _calendar_entries(days=60, limit=400)
+    if not evs:
+        return
+    def fmt(dt):
+        return dt.astimezone(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//SkyNews//光遇日历//ZH",
+             "CALSCALE:GREGORIAN", "METHOD:PUBLISH", "X-WR-CALNAME:光遇·红石/活动",
+             "X-WR-TIMEZONE:Asia/Shanghai", "REFRESH-INTERVAL;VALUE=DURATION:PT1H"]
+    for dt, label in evs:
+        summary = label.split("】")[-1] if "】" in label else label
+        typ = "红石" if "红石" in label else ("黑石" if "黑石" in label else "日程")
+        lines += ["BEGIN:VEVENT",
+                  "UID:%s-%s@skynews" % (fmt(dt), abs(hash(label)) % 10 ** 8),
+                  "DTSTAMP:" + fmt(datetime.now(timezone.utc)),
+                  "DTSTART:" + fmt(dt), "DTEND:" + fmt(dt + timedelta(minutes=52)),
+                  "SUMMARY:【%s】%s" % (typ, summary),
+                  "DESCRIPTION:" + label, "END:VEVENT"]
+    lines.append("END:VCALENDAR")
+    atomic_write(os.path.join(out_dir, "calendar.ics"), "\r\n".join(lines) + "\r\n")
+    print("calendar.ics written:", len(evs), "events")
+
 
 
 def src_calendar():
@@ -1403,6 +1551,10 @@ def main(argv=None):
         write_history(args.out, data)
     except Exception as e:  # noqa: BLE001
         print("history skipped:", e)
+    try:
+        write_calendar_ics(args.out)
+    except Exception as e:  # noqa: BLE001
+        print("calendar.ics skipped:", e)
     if args.show:
         print_summary(data)
 
