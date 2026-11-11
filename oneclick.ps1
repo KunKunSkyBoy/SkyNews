@@ -85,6 +85,7 @@ function Deploy-GitHub {
         # 同步本地文件到仓库（保持仓库与本地一致）
         $items = @(
             @{ src = 'relay'; dst = 'relay'; dir = $true },
+            @{ src = '.gitignore'; dst = '.gitignore'; dir = $false },
             @{ src = '.github\workflows'; dst = '.github\workflows'; dir = $true },
             @{ src = 'app\src'; dst = 'app\src'; dir = $true },
             @{ src = 'app\assets'; dst = 'app\assets'; dir = $true },
