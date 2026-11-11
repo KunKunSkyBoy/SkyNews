@@ -68,6 +68,7 @@ MIXIN = [46, 47, 18, 2, 53, 8, 23, 32, 15, 50, 10, 31, 58, 3, 45, 35, 27, 43,
 
 SOURCE_LABEL = {"official": "官网", "taptap": "TapTap", "taptap_hot": "TapTap热帖",
     "daily": "每日任务",
+    "extra": "速览",
                 "bili": "B站", "weibo": "微博", "douyin": "抖音", "xhs": "小红书"}
 
 
@@ -496,6 +497,55 @@ def _daily_from_t1qq():
     return date, "今日每日任务：\n" + "\n".join(lines)
 
 
+
+def src_extra():
+    """光遇今日速览（应天API：季蜡/大蜡烛位置、免费魔法、季节倒计时）。"""
+    key = (os.environ.get("SKYNEWS_T1QQ_KEY") or "").strip()
+    if not key:
+        raise NotConfigured("未配置 SKYNEWS_T1QQ_KEY（应天API 免费密钥）")
+    lines = []
+    try:
+        d = http_get_json("https://api.t1qq.com/api/sky/sc/lzwz?key=" + urllib.parse.quote(key),
+                          referer="https://api.t1qq.com/")
+        jl = ((d.get("jlwz") or {}).get("text") or "").strip()
+        dl = ((d.get("dlwz") or {}).get("text") or "").strip()
+        if jl:
+            lines.append("季节蜡烛：" + jl)
+        if dl:
+            lines.append("大蜡烛：" + dl)
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        d = http_get_json("https://api.t1qq.com/api/sky/mf/mf?key=" + urllib.parse.quote(key),
+                          referer="https://api.t1qq.com/")
+        mg = [ (m.get("text") or "").strip() for m in (d.get("magic") or []) ]
+        mg = [m for m in mg if m]
+        if mg:
+            lines.append("今日免费魔法：" + "、".join(mg))
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        d = http_get_json("https://api.t1qq.com/api/sky/sc/gf/djs?key=" + urllib.parse.quote(key),
+                          referer="https://api.t1qq.com/")
+        data = d.get("data") or {}
+        inner = data.get("data") or {}
+        txt = data.get("days") or ""
+        if txt:
+            lines.append(txt)
+        if inner.get("seasonal"):
+            lines.append(str(inner.get("seasonal")))
+        if inner.get("grad"):
+            lines.append(str(inner.get("grad")))
+    except Exception:  # noqa: BLE001
+        pass
+    if not lines:
+        raise RuntimeError("速览数据为空")
+    label = datetime.now(timezone(timedelta(hours=8))).strftime("%m月%d日")
+    return [make_item("extra-" + datetime.now(timezone(timedelta(hours=8))).strftime("%Y%m%d"),
+                      "extra", label + " 光遇速览",
+                      "https://www.ovoav.com/", None, "\n".join(lines))]
+
+
 def src_daily():
     """光遇每日任务（主：skydaily.nankki.com 免费 API；备：oivio 公开 data.json）。"""
     date, body = "", ""
@@ -707,6 +757,7 @@ def build_sources():
     wanted = [alias.get(x, x) for x in wanted]
     table = {
         "daily": src_daily,
+        "extra": src_extra,
         "official": src_official,
         "taptap": src_taptap,
         "taptap_hot": src_taptap_hot,
