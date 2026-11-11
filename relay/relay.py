@@ -21,6 +21,7 @@
 """
 import argparse
 import hashlib
+import html
 import json
 import os
 import random
@@ -373,6 +374,70 @@ def _weibo_web_pages():
     raise RuntimeError("公开时间线不可用：%s" % last)
 
 
+
+def _strip_html(raw):
+    raw = re.sub(r"<script.*?</script>", " ", raw, flags=re.S | re.I)
+    raw = re.sub(r"<style.*?</style>", " ", raw, flags=re.S | re.I)
+    raw = re.sub(r"<br\s*/?>", "\n", raw, flags=re.I)
+    raw = re.sub(r"</p>", "\n", raw, flags=re.I)
+    raw = re.sub(r"<[^>]+>", " ", raw)
+    raw = html.unescape(raw)
+    raw = re.sub(r"[ \t\r\f\v]+", " ", raw)
+    raw = re.sub(r" *\n *", "\n", raw)
+    raw = re.sub(r"\n{3,}", "\n\n", raw)
+    return raw.strip()
+
+
+def article_text(url, title="", limit=3000):
+    """抓原文正文（官网/TapTap 等服务端渲染页面），失败返回空串。"""
+    url = canon_url(url)
+    if not url.startswith("http"):
+        return ""
+    try:
+        h = http_get(url)
+    except Exception:  # noqa: BLE001
+        return ""
+    m = re.search(r'itemprop="text"[^>]*>(.*?)(?:<!--\]--></div>|$)', h, re.S | re.I)
+    raw = m.group(1) if m else h
+    txt = _strip_html(raw)
+    if len(txt) < 80:
+        return ""
+    if title:
+        t = clean_text(title, 200)
+        if txt.startswith(t):
+            txt = txt[len(t):].strip()
+    # 去掉常见的站点尾部
+    for tail in ("前往论坛", "查看游戏", "申请加入测试服", "开发者中心", "TapTap 制造"):
+        i = txt.find(tail)
+        if i > 200:
+            txt = txt[:i].strip()
+            break
+    return txt[:limit]
+
+
+def enrich_full_text(items, cfg):
+    """把官网/TapTap 的正文抓进 feed：App 里直接读全文，不用再跳浏览器。"""
+    targets = [it for it in items
+               if it.get("source") in ("official", "taptap")
+               and len(it.get("summary") or "") < 600
+               and it.get("url")]
+    if not targets:
+        return items
+    max_n = min(len(targets), int(cfg.get("enrich_max", 40)))
+
+    def work(it):
+        try:
+            body = article_text(it.get("url", ""), it.get("title", ""))
+            if body and len(body) > len(it.get("summary") or "") + 40:
+                it["summary"] = body[:3000]
+                it["text"] = (it.get("title") or "") + "\n\n" + body[:3000]
+        except Exception:  # noqa: BLE001
+            pass
+
+    with ThreadPoolExecutor(max_workers=6) as ex:
+        list(ex.map(work, targets[:max_n]))
+    return items
+
 def src_weibo():
     cookie = (os.environ.get("WEIBO_COOKIE") or "").strip()
     base = (os.environ.get("RSSHUB_BASE") or "").rstrip("/")
@@ -692,6 +757,7 @@ def build(cfg, cache_path):
                 results[name], items_by_source[name] = meta, got
 
     merged = merge_items(items_by_source, cfg)
+    merged = enrich_full_text(merged, cfg)
     problems = []
     for name, meta in sorted(results.items()):
         if not meta.get("ok"):
