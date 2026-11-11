@@ -288,6 +288,36 @@ def fetch_rss(url, source, referer=None):
     return parse_rss_items(xml_text, source, referer)
 
 
+def _weibo_web_pages():
+    """无需 cookie：m.weibo.cn 公开时间线（部分出口 IP 可用，GitHub Actions 常被 432/418）。"""
+    referer = "https://m.weibo.cn/u/%d" % WEIBO_UID
+    url = ("https://m.weibo.cn/api/container/getIndex?type=uid&value=%d"
+           "&containerid=107603%d" % (WEIBO_UID, WEIBO_UID))
+    last = None
+    for ua in range(len(UAS)):
+        try:
+            data = http_get_json(url, referer=referer, ua_index=ua)
+            if int(data.get("ok") or 0) != 1:
+                raise RuntimeError("ok=%s" % data.get("ok"))
+            out = []
+            for card in data.get("data", {}).get("cards", []):
+                mb = card.get("mblog")
+                if not mb:
+                    continue
+                ts = parse_weibo_time(mb.get("created_at"))
+                text = re.sub(r"<[^>]+>", "", mb.get("text", ""))
+                out.append(make_item("wb-" + str(mb.get("id", "")), "weibo",
+                                     clean_text(text, 120),
+                                     "https://m.weibo.cn/detail/" + str(mb.get("id", "")),
+                                     ts, re.sub(r"<[^>]+>", " ", mb.get("text", ""))))
+            if out:
+                return out
+            raise RuntimeError("无 mblog")
+        except Exception as e:  # noqa: BLE001
+            last = e
+    raise RuntimeError("公开时间线不可用：%s" % last)
+
+
 def src_weibo():
     cookie = (os.environ.get("WEIBO_COOKIE") or "").strip()
     base = (os.environ.get("RSSHUB_BASE") or "").rstrip("/")
@@ -310,8 +340,18 @@ def src_weibo():
         raise RuntimeError("WEIBO_COOKIE 可能已失效（无 mblog）")
     if base:
         route = (os.environ.get("SKYNEWS_WEIBO_ROUTE") or "/weibo/user/%d" % WEIBO_UID).strip()
-        return fetch_rss(base + route, "weibo", referer=base + "/")
-    raise RuntimeError("未配置 WEIBO_COOKIE，也没有 RSSHUB_BASE")
+        try:
+            return fetch_rss(base + route, "weibo", referer=base + "/")
+        except Exception as e:  # noqa: BLE001
+            # 公共 RSSHub 对微博路由多数需要实例侧 cookie；失败时再试公开时间线
+            try:
+                return _weibo_web_pages()
+            except Exception as e2:  # noqa: BLE001
+                raise RuntimeError("RSSHub 失败（%s），公开时间线也失败（%s）" % (e, e2))
+    try:
+        return _weibo_web_pages()
+    except Exception as e:  # noqa: BLE001
+        raise RuntimeError("未配置 WEIBO_COOKIE/RSSHUB_BASE，公开时间线不可用（%s）" % e)
 
 
 def parse_weibo_time(s):
