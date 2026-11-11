@@ -153,3 +153,6 @@ https://sixhorse.game.163.com/news/outer/newslist_search.do?start=1&limit=40&con
 - **构建/发布**：新增 `build_win.ps1`（PC 无 Gradle 构建）、`release.ps1`（自动构建 → dist + build-info）、`tools/smoke_test_apk.ps1`（装机冒烟）；修复 Windows 下 aapt2 资源名反斜杠 + zipalign 对齐问题。
 - **云中继 v2**（`relay/`）：schema:2、源健康、失败回退 stale、跨源去重、微博/抖音/小红书（cookie/RSSHub）、CI 内容变化才提交；详见 `relay/STABILITY.md`。
 - 版本：versionName 2.5 / versionCode 7。
+## v2.6 修复（2026-11-12）
+- 源健康去重 + 中文化（官网/TapTap/B站/微博/抖音/小红书），旧 schema problems 不再重复显示；stale 标记透传到 App。
+- 新增 `oneclick.ps1` 一键脚本（release/data/deploy/verify/all + 装机冒烟）。

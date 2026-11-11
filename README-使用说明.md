@@ -1,13 +1,13 @@
-# 光遇公告 App（com.dsh.skynews）使用说明 v2.5
+# 光遇公告 App（com.dsh.skynews）使用说明 v2.6
 
 ## 装在哪
-- 最新 APK：`dist/SkyNews-v2.5.apk`（本地构建，约 257 KB，debug 签名，versionCode 7）
+- 最新 APK：`dist/SkyNews-v2.6.apk`（本地构建，约 257 KB，debug 签名，versionCode 8）
 - 源码：`app/src/com/dsh/skynews/MainActivity.java`（单文件）+ `app/assets/sky/*.json`（光遇静态资料）
 - 构建：`powershell -ExecutionPolicy Bypass -File build_win.ps1`（PC，无需 Gradle/Android Studio）
 - 发布：`powershell -ExecutionPolicy Bypass -File release.ps1`（自动构建 → `dist/` + build-info.json）
 - 冒烟：`powershell -ExecutionPolicy Bypass -File tools\smoke_test_apk.ps1 -Serial <设备序列号>`
 
-## 七个页签（v2.5）
+## 七个页签（v2.6）
 1. **公告**：官方公告全文，金色小标题渲染，底部「复制全文 / 原文 / 刷新」
 2. **动态**：官网新闻 + TapTap + B 站 + 云中继（微博/抖音/小红书）统一时间线；★收藏、只看收藏、搜索
 3. **变更历史**：公告变化自动留档，可回看旧版本
@@ -48,3 +48,25 @@
 - GitHub Actions 境外 IP 访问 B 站可能 412（CI 默认跳过 B 站，由 App 本地补）；
 - 资料页是**静态快照**（生成时间见页面提示），过期需重跑 `tools/build_skynews_assets.py`；
 - 系统省电模式可能推迟 JobScheduler（安卓最小 15 分钟）；更准时用「常驻监控 + 极速模式」。
+
+## 一键脚本（v2.6 新增）
+```powershell
+# 完整流程：重生成资料 → 构建 → 发布到 dist → 装机冒烟 → 推送 GitHub → 验证线上
+$env:SKYNEWS_GH_TOKEN="你的 token"   # 仅当前窗口，不写文件
+powershell -ExecutionPolicy Bypass -File oneclick.ps1 -Action all -Device HA25G639
+
+# 只构建+发布
+powershell -ExecutionPolicy Bypass -File oneclick.ps1 -Action release
+# 只重生成光遇资料并发布
+powershell -ExecutionPolicy Bypass -File oneclick.ps1 -Action data
+# 只部署（推 relay/App/CI 到 GitHub）并验证线上 feed
+powershell -ExecutionPolicy Bypass -File oneclick.ps1 -Action deploy
+# 只验证线上 feed（schema:2/源健康）
+powershell -ExecutionPolicy Bypass -File oneclick.ps1 -Action verify
+```
+
+## v2.6 修复
+- 源健康显示不再重复：有 schema:2 的 sources 时忽略旧 problems，并自动清理旧源名
+- 中继源名中文化（官网/TapTap/B站/微博/抖音/小红书）
+- 中继条目的 stale 标记会带进 App（失败源旧条目灰显）
+- 版本 2.6 (8)
