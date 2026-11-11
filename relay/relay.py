@@ -1500,7 +1500,7 @@ footer{padding:14px 16px;font-size:11px;color:#5f7286}
 <header><h1>光遇工具 · SkyNews</h1><div class="meta">免费数据源：skydaily · 应天API · oivio ｜ 更新时间 %s</div></header>
 <nav>%s</nav>
 %s
-<footer>数据来自第三方公开接口，仅供参考；每日自动更新。</footer>
+<footer>每日自动更新 ｜ <a style="color:#7bd8c4" href="calendar.ics">订阅日历 ICS</a><br/>数据来自第三方公开接口，仅供参考。</footer>
 </body></html>""" % (
         datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M"),
         "".join('<a href="#%s">%s</a>' % (sid, title) for sid, title, _, _ in sections),
