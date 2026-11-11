@@ -457,45 +457,40 @@ def _collect_daily_strings(obj, out, depth=0):
 
 
 def src_daily():
-    """光遇每日任务（独角兽API，需要免费密钥 SKYNEWS_DAILY_KEY）。"""
-    key = (os.environ.get("SKYNEWS_DAILY_KEY") or os.environ.get("UNICORN_KEY") or "").strip()
-    if not key:
-        raise NotConfigured("未配置 SKYNEWS_DAILY_KEY（独角兽API 免费密钥）")
-    out = []
+    """光遇每日任务（免费公共 API：skydaily.nankki.com，无需密钥）。"""
+    d = http_get_json("https://skydaily.nankki.com/v1/daily",
+                      referer="https://skydaily.nankki.com/")
+    data = d.get("data") or {}
+    tasks = data.get("tasks") or []
+    if not tasks:
+        raise RuntimeError("每日任务接口返回为空")
+    date = d.get("date") or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    lines = []
+    for i, t in enumerate(tasks[:8]):
+        txt = (t.get("text") or "").strip()
+        if txt:
+            lines.append("%d. %s" % (t.get("number") or (i + 1), txt))
+    body = "今日每日任务：\n" + "\n".join(lines)
+    # 大蜡烛 / 季蜡 提示
     try:
-        d1 = http_get_json("https://ovoav.com/api/sky/rwwz/rw1?key=" + urllib.parse.quote(key),
-                           referer="https://www.ovoav.com/doc/67")
-        if int(d1.get("code") or 0) == 200:
-            _collect_daily_strings(d1.get("data"), out)
+        c = http_get_json("https://skydaily.nankki.com/v1/daily/candles",
+                          referer="https://skydaily.nankki.com/")
+        for e in (c.get("data") or [])[:4]:
+            title = (e.get("title") or "").strip()
+            txt = (e.get("text") or "").strip()
+            if title and txt:
+                body += "\n" + title + "：" + txt.split("\n")[0][:120]
     except Exception:  # noqa: BLE001
         pass
-    if not out:
-        try:
-            d1 = http_get_json("https://ovoav.com/api/sky/rwwz/rw?key=" + urllib.parse.quote(key),
-                               referer="https://www.ovoav.com/doc/6")
-            if int(d1.get("code") or 0) == 200:
-                _collect_daily_strings(d1.get("data"), out)
-        except Exception:  # noqa: BLE001
-            pass
-    # 大蜡烛位置
-    candle = ""
-    try:
-        d2 = http_get_json("https://ovoav.com/api/sky/rwby/dl?key=" + urllib.parse.quote(key),
-                           referer="https://www.ovoav.com/doc/95")
-        if int(d2.get("code") or 0) == 200:
-            tmp = []
-            _collect_daily_strings(d2.get("data"), tmp)
-            candle = " · ".join(tmp[:4])
-    except Exception:  # noqa: BLE001
-        pass
-    if not out:
-        raise RuntimeError("每日任务接口返回为空（密钥可能无效/过期）")
-    body = "\n".join(out[:8])
-    if candle:
-        body += "\n大蜡烛：" + candle
-    d = datetime.now(timezone.utc).strftime("%m月%d日")
-    return [make_item("daily-" + datetime.now(timezone.utc).strftime("%Y%m%d"), "daily",
-                      d + " 每日任务", "https://www.ovoav.com/doc/67", None, body)]
+    ts = int(datetime.strptime(date, "%Y-%m-%d").replace(
+        tzinfo=timezone.utc).timestamp()) if re.match(r"^\d{4}-\d{2}-\d{2}$", date) else None
+    parts = date.split("-")
+    label = ("%s月%s日" % (parts[1], parts[2])) if len(parts) == 3 else date
+    return [make_item("daily-" + date.replace("-", ""), "daily",
+                      label + " 每日任务",
+                      "https://skydaily.nankki.com/", ts, body)]
+
+
 
 def src_weibo():
     cookie = (os.environ.get("WEIBO_COOKIE") or "").strip()
