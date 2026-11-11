@@ -1,26 +1,26 @@
 {
  "schema": 2,
- "generated_at": "2026-11-11T16:51:36Z",
- "updated": "2026-11-11T16:51:36Z",
+ "generated_at": "2026-11-11T16:52:30Z",
+ "updated": "2026-11-11T16:52:30Z",
  "count": 30,
  "sources": {
   "official": {
    "ok": true,
    "count": 30,
    "error": null,
-   "elapsed_ms": 1407,
-   "last_success": "2026-11-11T16:51:35Z"
+   "elapsed_ms": 1341,
+   "last_success": "2026-11-11T16:52:25Z"
   },
   "weibo": {
    "ok": false,
    "count": 0,
-   "error": "HTTPError: HTTP Error 403: Forbidden（重试 3 次）",
-   "elapsed_ms": 3058,
+   "error": "HTTPError: HTTP Error 503: Service Unavailable（重试 3 次）",
+   "elapsed_ms": 5596,
    "last_success": null
   }
  },
  "problems": [
-  "微博: HTTPError: HTTP Error 403: Forbidden（重试 3 次）"
+  "微博: HTTPError: HTTP Error 503: Service Unavailable（重试 3 次）"
  ],
  "items": [
   {
