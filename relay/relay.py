@@ -71,7 +71,7 @@ MIXIN = [46, 47, 18, 2, 53, 8, 23, 32, 15, 50, 10, 31, 58, 3, 45, 35, 27, 43,
 
 SOURCE_LABEL = {"official": "官网", "taptap": "TapTap", "taptap_hot": "TapTap热帖",
     "daily": "每日任务",
-    "extra": "速览",
+    "extra": "速览", "calendar": "日历",
                 "bili": "B站", "weibo": "微博", "douyin": "抖音", "xhs": "小红书"}
 
 
@@ -541,12 +541,76 @@ def src_extra():
             lines.append(str(inner.get("grad")))
     except Exception:  # noqa: BLE001
         pass
+    try:
+        for e in _ics_upcoming(days=5, limit=3):
+            lines.append("日程：" + e)
+    except Exception:  # noqa: BLE001
+        pass
     if not lines:
         raise RuntimeError("速览数据为空")
     label = datetime.now(timezone(timedelta(hours=8))).strftime("%m月%d日")
     return [make_item("extra-" + datetime.now(timezone(timedelta(hours=8))).strftime("%Y%m%d"),
                       "extra", label + " 光遇速览",
                       "https://www.ovoav.com/", None, "\n".join(lines))]
+
+
+
+def _ics_upcoming(days=10, limit=6):
+    """从 sky-ics.pages.dev 的 ICS 日历里取未来事件（红石/活动/复刻，免费无需 key）。"""
+    url = ("https://sky-ics.pages.dev/calendar.ics?types=red,traveling_spirit,season,activity"
+           "&endOnly=traveling_spirit,season,activity")
+    txt = http_get_bytes(url, referer="https://sky-ics.pages.dev/").decode("utf-8", "replace")
+    txt = txt.replace("\r\n", "\n").replace("\r", "\n")
+    # 处理 ICS 折行（续行以空格/tab 开头）
+    lines = []
+    for ln in txt.split("\n"):
+        if ln.startswith((" ", "\t")) and lines:
+            lines[-1] += ln[1:]
+        else:
+            lines.append(ln)
+    events = []
+    cur = None
+    for ln in lines:
+        if ln == "BEGIN:VEVENT":
+            cur = {}
+        elif ln == "END:VEVENT":
+            if cur:
+                events.append(cur)
+            cur = None
+        elif cur is not None and ":" in ln:
+            k, v = ln.split(":", 1)
+            k = k.split(";")[0]
+            cur[k] = v
+    now = datetime.now(timezone.utc)
+    out = []
+    for ev in events:
+        ds = (ev.get("DTSTART") or "").strip()
+        try:
+            dt = datetime.strptime(ds, "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc)
+        except Exception:  # noqa: BLE001
+            continue
+        if dt < now - timedelta(hours=2) or dt > now + timedelta(days=days):
+            continue
+        title = (ev.get("SUMMARY") or "").strip()
+        loc = (ev.get("LOCATION") or "").strip()
+        bj = dt + timedelta(hours=8)
+        out.append((dt, "%d月%d日 %02d:%02d %s%s" % (
+            bj.month, bj.day, bj.hour, bj.minute, title,
+            ("（" + loc + "）") if loc and loc not in title else "")))
+    out.sort(key=lambda x: x[0])
+    return [x[1] for x in out[:limit]]
+
+
+def src_calendar():
+    """光遇日历（红石/活动/旅行先祖，ICS 免费源）。"""
+    evs = _ics_upcoming()
+    if not evs:
+        raise RuntimeError("日历接口暂无未来事件")
+    lines = ["接下来 " + str(len(evs)) + " 项："] + ["· " + e for e in evs]
+    label = datetime.now(timezone(timedelta(hours=8))).strftime("%m月%d日")
+    return [make_item("cal-" + datetime.now(timezone(timedelta(hours=8))).strftime("%Y%m%d"),
+                      "calendar", label + " 光遇日历", "https://sky-ics.pages.dev/", None,
+                      "\n".join(lines))]
 
 
 def src_daily():
@@ -761,6 +825,7 @@ def build_sources():
     table = {
         "daily": src_daily,
         "extra": src_extra,
+        "calendar": src_calendar,
         "official": src_official,
         "taptap": src_taptap,
         "taptap_hot": src_taptap_hot,
@@ -1222,6 +1287,14 @@ def write_tools_html(out_dir, data):
         sections.append(("daily", "每日任务", daily_t, []))
     if extra_t:
         sections.append(("extra", "今日速览（季蜡/大蜡/魔法/赛季）", extra_t, []))
+    # 红石/活动/复刻 日程（ICS）
+    try:
+        cal_lines = _ics_upcoming(days=10, limit=8)
+        if cal_lines:
+            sections.append(("calendar", "近期日程（红石/活动/复刻）",
+                             "<br/>".join(html_mod.escape(x) for x in cal_lines), []))
+    except Exception:  # noqa: BLE001
+        pass
     # 红石天气图片（keyless URL）
     gytq_imgs = []
     try:
