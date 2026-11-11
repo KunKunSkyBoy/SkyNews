@@ -1,0 +1,171 @@
+﻿# SkyNews 一键补全/优化脚本（Windows）
+#   - 构建 APK（无 Gradle）
+#   - 重新生成光遇资料 assets（可选）
+#   - 发布到 dist/（自动版本/大小/sha256）
+#   - 一键部署到 GitHub（relay + App 源码 + CI）
+#   - 部署后验证线上 feed（schema/源健康）
+#   - 可选装机冒烟（MuMu / 真机）
+#
+# 用法：
+#   powershell -ExecutionPolicy Bypass -File oneclick.ps1 -Action all
+#   powershell -ExecutionPolicy Bypass -File oneclick.ps1 -Action release -Device HA25G639
+#   powershell -ExecutionPolicy Bypass -File oneclick.ps1 -Action data
+#   powershell -ExecutionPolicy Bypass -File oneclick.ps1 -Action deploy
+#   powershell -ExecutionPolicy Bypass -File oneclick.ps1 -Action verify
+#
+# 部署需要令牌：设置环境变量 SKYNEWS_GH_TOKEN（或 GH_TOKEN），不要写进任何文件。
+param(
+    [ValidateSet('all', 'release', 'data', 'deploy', 'verify', 'build')]
+    [string]$Action = 'all',
+    [string]$Device = '',
+    [string]$Repo = 'KunKunSkyBoy/SkyNews',
+    [string]$Branch = 'main'
+)
+$ErrorActionPreference = 'Stop'
+$ROOT = Split-Path -Parent $MyInvocation.MyCommand.Path
+$PY = 'E:\gongzuoqu\_archive\qq_stack_20261111\zhenxun_bot\venv\Scripts\python.exe'
+if (-not (Test-Path $PY)) { $PY = 'python' }
+$SDK = 'E:\gongzuoqu\逆向环境\android-sdk'
+$BT = Join-Path $SDK 'build-tools\35.0.0'
+$ADB = Join-Path $SDK 'platform-tools\adb.exe'
+$AAPT2 = Join-Path $BT 'aapt2.exe'
+
+function Log($m) { Write-Host "== $m ==" }
+
+function Build-Apk {
+    Log '构建 APK'
+    & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ROOT 'build_win.ps1')
+    if ($LASTEXITCODE -ne 0) { throw 'build failed' }
+}
+
+function Release-Apk {
+    Log '发布到 dist/'
+    & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ROOT 'release.ps1')
+    if ($LASTEXITCODE -ne 0) { throw 'release failed' }
+}
+
+function Regen-Data {
+    Log '重新生成光遇资料 assets'
+    & $PY (Join-Path $ROOT 'tools\build_skynews_assets.py')
+    if ($LASTEXITCODE -ne 0) { throw 'assets build failed' }
+}
+
+function Install-Smoke([string]$serial) {
+    if (-not $serial) { return }
+    Log "装机冒烟: $serial"
+    & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ROOT 'tools\smoke_test_apk.ps1') -Serial $serial
+    if ($LASTEXITCODE -ne 0) { throw 'smoke test failed' }
+}
+
+function Read-Token {
+    $t = $env:SKYNEWS_GH_TOKEN
+    if (-not $t) { $t = $env:GH_TOKEN }
+    return $t
+}
+
+function Deploy-GitHub {
+    Log '部署到 GitHub'
+    $ErrorActionPreference = 'Continue'   # git 会往 stderr 打进度，PS5.1 下 Stop 会误报
+    $token = Read-Token
+    if (-not $token) { throw '缺少令牌：请设置环境变量 SKYNEWS_GH_TOKEN 后重试' }
+    $tmp = Join-Path $env:TEMP ('skynews-deploy-' + [guid]::NewGuid().ToString('N'))
+    $cfg = Join-Path $tmp 'gitconfig'
+    New-Item -ItemType Directory -Force $tmp | Out-Null
+    Set-Content -Path $cfg -Value '' -Encoding ascii
+    $oldCfg = $env:GIT_CONFIG_GLOBAL
+    $oldPrompt = $env:GIT_TERMINAL_PROMPT
+    try {
+        $env:GIT_CONFIG_GLOBAL = $cfg
+        $env:GIT_TERMINAL_PROMPT = '0'
+        $url = "https://x-access-token:$token@github.com/$Repo.git"
+        $clone = Join-Path $tmp 'repo'
+        git -c user.name='SkyNews Bot' -c user.email='bot@example.com' clone --depth 1 $url $clone 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw 'clone failed（令牌无效或仓库不可访问）' }
+
+        # 同步本地文件到仓库（保持仓库与本地一致）
+        $items = @(
+            @{ src = 'relay'; dst = 'relay'; dir = $true },
+            @{ src = '.github\workflows'; dst = '.github\workflows'; dir = $true },
+            @{ src = 'app\src'; dst = 'app\src'; dir = $true },
+            @{ src = 'app\assets'; dst = 'app\assets'; dir = $true },
+            @{ src = 'app\AndroidManifest.xml'; dst = 'app\AndroidManifest.xml'; dir = $false },
+            @{ src = 'tools'; dst = 'tools'; dir = $true },
+            @{ src = 'build_win.ps1'; dst = 'build_win.ps1'; dir = $false },
+            @{ src = 'release.ps1'; dst = 'release.ps1'; dir = $false },
+            @{ src = 'oneclick.ps1'; dst = 'oneclick.ps1'; dir = $false },
+            @{ src = 'README.md'; dst = 'README.md'; dir = $false },
+            @{ src = 'README-使用说明.md'; dst = 'README-使用说明.md'; dir = $false },
+            @{ src = 'UPGRADE_PLAN.md'; dst = 'UPGRADE_PLAN.md'; dir = $false },
+            @{ src = 'docs'; dst = 'docs'; dir = $true }
+        )
+        foreach ($it in $items) {
+            $s = Join-Path $ROOT $it.src
+            if (-not (Test-Path $s)) { continue }
+            $d = Join-Path $clone $it.dst
+            if ($it.dir) {
+                New-Item -ItemType Directory -Force (Split-Path $d) | Out-Null
+                Copy-Item $s $d -Recurse -Force
+            } else {
+                New-Item -ItemType Directory -Force (Split-Path $d) | Out-Null
+                Copy-Item $s $d -Force
+            }
+        }
+        # 发布产物
+        $apk = Join-Path $ROOT 'skynews.apk'
+        if (Test-Path $apk) { Copy-Item $apk (Join-Path $clone 'skynews.apk') -Force }
+
+        Push-Location $clone
+        git add -A
+        $msg = 'chore: one-click sync ' + (Get-Date -Format 'yyyy-MM-dd HH:mm')
+        git -c user.name='SkyNews Bot' -c user.email='bot@example.com' commit -m $msg 2>&1 | Out-Null
+        git push $url $Branch 2>&1 | Select-Object -Last 2
+        if ($LASTEXITCODE -ne 0) { throw 'push failed' }
+        Pop-Location
+        Log '已推送'
+    } finally {
+        $env:GIT_CONFIG_GLOBAL = $oldCfg
+        $env:GIT_TERMINAL_PROMPT = $oldPrompt
+        Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Verify-Online {
+    Log '验证线上中继'
+    Start-Sleep -Seconds 10
+    $feed = curl.exe -s --max-time 20 "https://kunkunskyboy.github.io/SkyNews/feed.json"
+    $file = Join-Path $env:TEMP 'skynews-feed-verify.json'
+    $feed | Out-File -Encoding utf8 $file
+    & $PY -c @"
+import json, sys
+raw = open(sys.argv[1], 'rb').read().lstrip(b'\xef\xbb\xbf')
+try:
+    d = json.loads(raw.decode('utf-8'))
+except Exception as e:
+    print('FEED PARSE FAIL:', e); sys.exit(1)
+print('schema:', d.get('schema'), 'items:', len(d.get('items') or []))
+ok = 0
+for k, v in (d.get('sources') or {}).items():
+    print('  %-10s %-4s count=%-4s %sms' % (k, 'ok' if v.get('ok') else 'fail', v.get('count'), v.get('elapsed_ms')))
+    if v.get('ok'): ok += 1
+print('sources ok: %d/%d' % (ok, len(d.get('sources') or {})))
+sys.exit(0 if d.get('schema') == 2 else 2)
+"@ $file
+    if ($LASTEXITCODE -ne 0) { throw '线上 feed 验证失败' }
+    Log '线上 feed 正常（schema:2）'
+}
+
+function Bump-Version {
+    # 从 AndroidManifest 读取当前版本，仅展示（版本号升级手动/由需求决定）
+    $m = Join-Path $ROOT 'app\AndroidManifest.xml'
+    $t = Get-Content $m -Raw -Encoding UTF8
+    if ($t -match 'versionName="([^"]+)"') { Log "当前版本 $($Matches[1])" }
+}
+
+Bump-Version
+if ($Action -eq 'build') { Build-Apk }
+elseif ($Action -eq 'release') { Build-Apk; Release-Apk; Install-Smoke $Device }
+elseif ($Action -eq 'data') { Regen-Data; Build-Apk; Release-Apk; Install-Smoke $Device }
+elseif ($Action -eq 'deploy') { Deploy-GitHub; Verify-Online }
+elseif ($Action -eq 'verify') { Verify-Online }
+elseif ($Action -eq 'all') { Regen-Data; Build-Apk; Release-Apk; Install-Smoke $Device; Deploy-GitHub; Verify-Online }
+Log '完成'

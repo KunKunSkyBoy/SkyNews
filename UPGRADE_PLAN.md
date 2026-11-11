@@ -56,3 +56,10 @@
 - 微博/抖音/小红书依赖 cookie/RSSHub，本机可能拿不到 → 用 fallback（跳过并显示问题）而不是阻塞。
 - GitHub Actions 境外 IP 被 B 站 412 → CI 跳过 B 站，App 本地抓；relay 输出 `sources.bili.ok=false` 但条目由 App 补。
 - 单文件 App 改动大，需防回归：每步构建 + MuMu 冒烟。
+
+## 部署记录（2026-11-12 00:40 完成）
+- 已推送到 `KunKunSkyBoy/SkyNews` 仓库（commit `6e5d8e3`），包含 relay v2、App v2.5 源码、assets、构建/发布/冒烟脚本、README/使用说明。
+- GitHub Actions `skynews-relay` 已手动触发并成功；线上 `https://kunkunskyboy.github.io/SkyNews/feed.json` 已是 **schema:2**（official 30 / taptap 10 / bili 13；weibo/douyin/xhs 未配置）。
+- 真机 HA25G639 验证：设置页「源健康」正确显示各源 ok/耗时/last_success（schema:2 解析 OK）。
+- 已知小瑕疵：relay 兼容字段 `problems` 与 `sources` 同时存在时，App 源健康里会出现重复的失败项（如「中继·B站」与「中继·bili」各一条），仅显示层面，不影响抓取。
+- 待用户配置（可选）：仓库 Secret `WEIBO_COOKIE`；仓库 Variable `RSSHUB_BASE`（抖音/小红书/微博兜底）。
