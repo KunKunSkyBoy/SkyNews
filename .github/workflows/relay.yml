@@ -69,6 +69,7 @@ jobs:
         env:
           WEIBO_COOKIE: ${{ secrets.WEIBO_COOKIE }}
           SKYNEWS_DAILY_KEY: ${{ secrets.UNICORN_KEY }}
+          SKYNEWS_T1QQ_KEY: ${{ secrets.T1QQ_KEY }}
           RSSHUB_BASE: ${{ github.event.inputs.rsshub || vars.RSSHUB_BASE }}
         run: |
           set -e
