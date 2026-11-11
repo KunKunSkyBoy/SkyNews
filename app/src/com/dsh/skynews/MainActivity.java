@@ -3,6 +3,7 @@ package com.dsh.skynews;
 import android.animation.ObjectAnimator;
 import android.animation.ValueAnimator;
 import android.app.Activity;
+import android.app.AlarmManager;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -98,6 +99,9 @@ public class MainActivity extends Activity {
     static final String CH_DAILY = "sky_daily_channel";
     static final int NID_FEED = 1003;
     static final int NID_DAILY = 1004;
+    static final int NID_SHARD = 1005;
+    static final String CH_SHARD = "sky_shard_channel";
+    static final String ACTION_SHARD = "com.dsh.skynews.SHARD_ALARM";
     static final String CH_ANN = "sky_ann_channel";
     static final String CH_MON = "sky_mon_channel";
     static final int NID_ANN = 1001;
@@ -176,6 +180,7 @@ public class MainActivity extends Activity {
         render();
         refresh(false);
         schedule(this);
+        scheduleShardAlarms(this);
         handleOpenIntent(getIntent());
     }
 
@@ -187,6 +192,11 @@ public class MainActivity extends Activity {
 
     private void handleOpenIntent(Intent i) {
         try {
+            int wantTab = i == null ? -1 : i.getIntExtra("tab", -1);
+            if (wantTab >= 0 && tabRow != null && wantTab < tabRow.getChildCount()) {
+                tab = wantTab;
+                render();
+            }
             String u = i == null ? "" : i.getStringExtra("open_url");
             if (u != null && u.startsWith("http")) open(u);
         } catch (Throwable ignore) {
@@ -1745,6 +1755,7 @@ public class MainActivity extends Activity {
 
     private void renderShard() {
         scheduleShardTick();
+        try { scheduleShardAlarms(this); } catch (Throwable ignore) {}
         final Calendar now = Calendar.getInstance();
         ShardDay t = shardDay(now);
         int accent = t.hasShard ? shardColor(t.isRed) : C_DIM;
@@ -1759,11 +1770,12 @@ public class MainActivity extends Activity {
         hero.setBackground(hg);
         content.addView(hero);
 
-        TextView badge = tv(t.hasShard ? (t.isRed ? "红石" : "黑石") : "今天无碎片", 26,
-                t.hasShard ? 0xFF12161F : C_DIM, true);
+        int badgeBg = t.hasShard ? accent : 0x338C97B3;
+        int badgeFg = t.hasShard ? 0xFF12161F : C_TEXT;
+        TextView badge = tv(t.hasShard ? (t.isRed ? "红石" : "黑石") : "今天无碎片", 26, badgeFg, true);
         badge.setGravity(Gravity.CENTER);
         badge.setPadding(dp(10), dp(12), dp(10), dp(12));
-        badge.setBackground(round(accent, 14));
+        badge.setBackground(round(badgeBg, 14));
         hero.addView(badge, lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         String dateLine = String.format("%02d-%02d 周%s",
@@ -1845,6 +1857,11 @@ public class MainActivity extends Activity {
             }
             content.addView(row);
         }
+        boolean remind = pref(this).getBoolean("shard_remind", true);
+        content.addView(tv(remind
+                        ? "⏰ 已开启：红石 / 黑石开始前 10 分钟提醒" + (canExact(this) ? "" : "（未授予精确闹钟权限）")
+                        : "⏰ 碎片提醒已关闭（设置 → 碎片提醒）",
+                12, remind ? C_ACCENT : C_DIM, false));
         content.addView(hint("社区算法（非官方）：周一/周四固定无碎片；1–15 号另停周三/周五，16 号后另停周二/周六。"
                 + "红石给升华蜡烛（2 / 2.5 / 3.5），黑石只给白蜡烛。最终以游戏内公告为准。"));
     }
@@ -2020,6 +2037,24 @@ content.addView(section("检测频率"));
         });
         content.addView(ae);
 
+        content.addView(section("碎片提醒"));
+        boolean sr = sp.getBoolean("shard_remind", true);
+        TextView srb = bigBtn(sr ? "● 碎片开始前 10 分钟提醒：开（红石 / 黑石）"
+                        : "○ 碎片开始前 10 分钟提醒：关",
+                sr ? 0xFF7BE3A5 : C_TEXT);
+        srb.setOnClickListener(x -> {
+            boolean now = pref(MainActivity.this).getBoolean("shard_remind", true);
+            pref(MainActivity.this).edit().putBoolean("shard_remind", !now).apply();
+            if (!now && !canExact(MainActivity.this)) {
+                toast("还需允许「闹钟和提醒」权限才能准点提醒");
+                requestExact(MainActivity.this);
+            }
+            scheduleShardAlarms(MainActivity.this);
+            toast(now ? "已关闭碎片提醒" : "已开启：红石 / 黑石开始前 10 分钟提醒");
+            render();
+        });
+        content.addView(srb);
+
         content.addView(section("变更取证（自动存档）"));
         boolean cap = sp.getBoolean("capture", true);
         TextView cp = bigBtn(cap ? "● 官方接口快照：开（零依赖，自带证据）" : "○ 官方接口快照：关", cap ? 0xFF7BE3A5 : C_TEXT);
@@ -2153,7 +2188,7 @@ content.addView(section("检测频率"));
         }
 
         content.addView(section("关于"));
-        content.addView(tv("SkyNews（光遇公告阅读器）v2.9 (11)", 13, C_TEXT, true));
+        content.addView(tv("SkyNews（光遇公告阅读器）v3.0 (12)", 13, C_TEXT, true));
         content.addView(tv("数据源：官方公告/新闻、TapTap、B站、云中继；抓取失败会保留旧条目（灰显）", 11, C_DIM, false));
         content.addView(tv("构建：无 Gradle（javac + aapt2 + d8 + apksigner）", 11, C_DIM, false));
 
@@ -2503,6 +2538,9 @@ content.addView(section("检测频率"));
         NotificationChannel dch = new NotificationChannel(CH_DAILY, "每日任务", NotificationManager.IMPORTANCE_DEFAULT);
         dch.setDescription("每天到点提醒做光遇每日任务");
         nm.createNotificationChannel(dch);
+        NotificationChannel sch = new NotificationChannel(CH_SHARD, "碎片提醒", NotificationManager.IMPORTANCE_HIGH);
+        sch.setDescription("红石 / 黑石开始前 10 分钟提醒");
+        nm.createNotificationChannel(sch);
     }
 
     static PendingIntent pi(Context c) {
@@ -2562,16 +2600,188 @@ content.addView(section("检测频率"));
             it.setFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK | android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP);
             android.app.PendingIntent pi2 = android.app.PendingIntent.getActivity(c, 2004, it,
                     android.app.PendingIntent.FLAG_UPDATE_CURRENT | android.app.PendingIntent.FLAG_IMMUTABLE);
+            String dailyBody = "";
+            try {
+                org.json.JSONArray arr = new org.json.JSONArray(sp.getString("feed", "[]"));
+                for (int i = 0; i < arr.length(); i++) {
+                    org.json.JSONObject o = arr.optJSONObject(i);
+                    if (o == null) continue;
+                    String src = o.optString("src", "");
+                    if ("每日任务".equals(src) || "daily".equals(src)) {
+                        String t = o.optString("text", "");
+                        if (!t.trim().isEmpty()) {
+                            dailyBody = t.trim();
+                            if (dailyBody.length() > 260) dailyBody = dailyBody.substring(0, 260) + "…";
+                            break;
+                        }
+                    }
+                }
+            } catch (Throwable ignore) {
+            }
+            if (dailyBody.isEmpty()) dailyBody = "今天的每日任务刷新啦，记得上线做～（点开 App 查看资料/活动）";
             Notification n = new Notification.Builder(c, CH_DAILY)
                     .setSmallIcon(android.R.drawable.ic_dialog_info)
                     .setContentTitle("光遇 · 每日任务")
-                    .setContentText("今天的每日任务刷新啦，记得上线做～")
-                    .setStyle(new Notification.BigTextStyle().bigText("今天的每日任务刷新啦，记得上线做～\n（4 个每日任务 + 大蜡烛，点开 App 查看资料/活动）"))
+                    .setContentText(dailyBody.replace("\n", " "))
+                    .setStyle(new Notification.BigTextStyle().bigText(dailyBody))
                     .setAutoCancel(true)
                     .setContentIntent(pi2)
                     .build();
             nm.notify(NID_DAILY, n);
         } catch (Throwable ignore) {
+        }
+    }
+
+    // ------------------------------------------------------------ 碎片提醒（开始前 10 分钟）
+
+    static PendingIntent shardAlarmPi(Context c, int slot, Intent it) {
+        int f = PendingIntent.FLAG_UPDATE_CURRENT;
+        if (Build.VERSION.SDK_INT >= 23) f |= PendingIntent.FLAG_IMMUTABLE;
+        return PendingIntent.getBroadcast(c, 4100 + slot, it, f);
+    }
+
+    static PendingIntent shardOpenPi(Context c) {
+        Intent i = new Intent(c, MainActivity.class).putExtra("tab", 6);
+        i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        int f = PendingIntent.FLAG_UPDATE_CURRENT;
+        if (Build.VERSION.SDK_INT >= 23) f |= PendingIntent.FLAG_IMMUTABLE;
+        return PendingIntent.getActivity(c, 4200, i, f);
+    }
+
+    /** 精确闹钟权限（Android 12+ 的「闹钟和提醒」特殊权限）。 */
+    static boolean canExact(Context c) {
+        if (Build.VERSION.SDK_INT < 31) return true;
+        try {
+            AlarmManager am = (AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
+            return am != null && am.canScheduleExactAlarms();
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    static void requestExact(Context c) {
+        if (Build.VERSION.SDK_INT < 31) return;
+        try {
+            Intent i = new Intent(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                    Uri.parse("package:" + c.getPackageName()));
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            c.startActivity(i);
+        } catch (Throwable ignore) {
+        }
+    }
+
+    /** 把接下来最多 6 个碎片窗口的「开始前 10 分钟」排成精确闹钟。 */
+    static void scheduleShardAlarms(Context c) {
+        AlarmManager am = (AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
+        if (am == null) return;
+        for (int slot = 0; slot < 6; slot++) {
+            Intent it = new Intent(c, ShardReceiver.class).setAction(ACTION_SHARD).putExtra("slot", slot);
+            try {
+                am.cancel(shardAlarmPi(c, slot, it));
+            } catch (Throwable ignore) {
+            }
+        }
+        if (!pref(c).getBoolean("shard_remind", true)) return;
+        long now = System.currentTimeMillis();
+        Calendar base = Calendar.getInstance();
+        int slot = 0;
+        for (int dayOff = 0; dayOff < 10 && slot < 6; dayOff++) {
+            Calendar day = (Calendar) base.clone();
+            day.add(Calendar.DAY_OF_MONTH, dayOff);
+            ShardDay d = shardDay(day);
+            if (!d.hasShard || d.times == null) continue;
+            for (int wi = 0; wi < d.times.length && slot < 6; wi++) {
+                Calendar st = (Calendar) day.clone();
+                st.set(Calendar.HOUR_OF_DAY, d.times[wi][0]);
+                st.set(Calendar.MINUTE, d.times[wi][1]);
+                st.set(Calendar.SECOND, 0);
+                st.set(Calendar.MILLISECOND, 0);
+                long trigger = st.getTimeInMillis() - 600000L;
+                if (trigger <= now + 2000L) continue;
+                Intent it = new Intent(c, ShardReceiver.class).setAction(ACTION_SHARD).putExtra("slot", slot);
+                PendingIntent pi = shardAlarmPi(c, slot, it);
+                try {
+                    am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, trigger, pi);
+                } catch (Throwable t) {
+                    try {
+                        am.setWindow(AlarmManager.RTC_WAKEUP, trigger, 300000L, pi);
+                    } catch (Throwable ignore) {
+                    }
+                }
+                slot++;
+            }
+        }
+    }
+
+    /** 现在是否落在某个窗口「开始前 10 分钟」内；是则发一次（当天该窗口只发一次）。 */
+    static void maybeNotifyShard(Context c) {
+        maybeNotifyShard(c, false);
+    }
+
+    /** force=true 时忽略时间判断，直接对最近一个窗口发提醒（调试用）。 */
+    static void maybeNotifyShard(Context c, boolean force) {
+        try {
+            SharedPreferences sp = pref(c);
+            if (!sp.getBoolean("shard_remind", true)) return;
+            Calendar now = Calendar.getInstance();
+            ShardDay d = shardDay(now);
+            Calendar day = now;
+            int idx = -1;
+            if (force) {
+                if (!d.hasShard || d.times == null) {
+                    ShardDay nx = nextShard(now, 10);
+                    if (nx == null) return;
+                    day = (Calendar) now.clone();
+                    day.add(Calendar.DAY_OF_MONTH, nx.daysAhead);
+                    d = nx;
+                }
+                idx = 0;
+            } else {
+                if (!d.hasShard || d.times == null) return;
+                long nowMs = now.getTimeInMillis();
+                for (int i = 0; i < d.times.length; i++) {
+                    Calendar st = (Calendar) now.clone();
+                    st.set(Calendar.HOUR_OF_DAY, d.times[i][0]);
+                    st.set(Calendar.MINUTE, d.times[i][1]);
+                    st.set(Calendar.SECOND, 0);
+                    st.set(Calendar.MILLISECOND, 0);
+                    long lead = st.getTimeInMillis() - nowMs;
+                    if (lead >= 0 && lead <= 660000L) {   // 提前 ≤11 分钟（含闹钟稍早触发）
+                        idx = i;
+                        break;
+                    }
+                }
+                if (idx < 0) return;
+            }
+            String dayKey = new SimpleDateFormat("yyyyMMdd", Locale.CHINA).format(day.getTime());
+            String key = "shard_sent_" + dayKey + "_" + idx + (force ? "_dbg" : "");
+            if (sp.getBoolean(key, false)) return;
+            String kind = d.isRed ? "红石" : "黑石";
+            String title = kind + " 10 分钟后开始";
+            StringBuilder body = new StringBuilder(d.place)
+                    .append(" · ").append(shardWin(d.times[idx]));
+            if (d.isRed) body.append(" · 升华×").append(trimNum(d.reward));
+            if (!notifyAllowed(c, title + " " + body)) return;
+            NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
+            Notification n = new Notification.Builder(c, CH_SHARD)
+                    .setSmallIcon(android.R.drawable.ic_dialog_info)
+                    .setContentTitle(title)
+                    .setContentText(body)
+                    .setStyle(new Notification.BigTextStyle().bigText(body))
+                    .setAutoCancel(true)
+                    .setContentIntent(shardOpenPi(c))
+                    .build();
+            nm.notify(NID_SHARD, n);
+            sp.edit().putBoolean(key, true).apply();
+        } catch (Throwable ignore) {
+        }
+    }
+
+    public static class ShardReceiver extends BroadcastReceiver {
+        @Override
+        public void onReceive(Context c, Intent i) {
+            maybeNotifyShard(c, i != null && i.getBooleanExtra("force", false));
+            scheduleShardAlarms(c);
         }
     }
 
@@ -2592,6 +2802,7 @@ content.addView(section("检测频率"));
         public boolean onStartJob(final JobParameters p) {
             new Thread(() -> {
                     maybeDailyReminder(getApplicationContext());
+                try { maybeNotifyShard(getApplicationContext()); } catch (Throwable ignore) {}
                 try {
                     if (!online(getApplicationContext())) { jobFinished(p, false); return; }
                     String ann = http(U_ANN);
@@ -2622,6 +2833,7 @@ content.addView(section("检测频率"));
         @Override
         public void onReceive(Context c, Intent i) {
             schedule(c);
+            try { scheduleShardAlarms(c); } catch (Throwable ignore) {}
         }
     }
 
@@ -2656,6 +2868,7 @@ content.addView(section("检测频率"));
                 worker = new Thread(() -> {
                     while (run) {
                         try { maybeDailyReminder(getApplicationContext()); } catch (Throwable ignore) {}
+                        try { maybeNotifyShard(getApplicationContext()); } catch (Throwable ignore) {}
                         try {
                             if (!online(getApplicationContext())) {
                                 try { Thread.sleep(60_000L); } catch (InterruptedException e) { break; }
@@ -2836,6 +3049,7 @@ content.addView(section("检测频率"));
             case "weibo": return "微博";
             case "douyin": return "抖音";
             case "xhs": return "小红书";
+            case "daily": return "每日任务";
             default: return key;
         }
     }
