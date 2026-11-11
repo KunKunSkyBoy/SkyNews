@@ -292,33 +292,84 @@ def fetch_rss(url, source, referer=None):
     return parse_rss_items(xml_text, source, referer)
 
 
+def _weibo_visitor_cookie():
+    """自动获取微博访客 Cookie（SUB/SUBP，无需登录）。失败返回空串。
+
+    流程：passport.weibo.com/visitor/genvisitor → 拿 tid → visitor?a=incarnate
+    这是微博公开的访客机制，不涉及账号登录。
+    """
+    import http.cookiejar
+
+    ua = ("Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) "
+          "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1")
+    jar = http.cookiejar.CookieJar()
+    opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
+    try:
+        body = urllib.parse.urlencode({
+            "cb": "visitor_gray_callback", "tid": "", "from": "weibo", "web_rid": "",
+        }).encode()
+        req = urllib.request.Request(
+            "https://passport.weibo.com/visitor/genvisitor2",
+            data=body,
+            headers={"User-Agent": ua, "Referer": "https://passport.weibo.com/visitor/visitor",
+                     "Content-Type": "application/x-www-form-urlencoded",
+                     "Accept-Encoding": "identity"},
+            method="POST")
+        with opener.open(req, timeout=8) as resp:
+            raw = resp.read().decode("utf-8", "replace")
+        m = re.search(r'"tid"\s*:\s*"([^"\\]+)"', raw) or re.search(r'tid%22%3A%22([^%]+)', raw)
+        if not m:
+            return ""
+        tid = m.group(1)
+        url = ("https://passport.weibo.com/visitor/visitor?a=incarnate&t=" + urllib.parse.quote(tid)
+               + "&w=2&c=095&gc=&cb=cross_domain&from=weibo&_rand=" + str(random.random()))
+        req2 = urllib.request.Request(url, headers={
+            "User-Agent": ua, "Referer": "https://passport.weibo.com/visitor/visitor",
+            "Accept-Encoding": "identity"})
+        with opener.open(req2, timeout=8) as resp2:
+            resp2.read()
+        pairs = []
+        for c in jar:
+            if c.name in ("SUB", "SUBP", "SUB_2", "_T_WM", "XSRF-TOKEN"):
+                pairs.append("%s=%s" % (c.name, c.value))
+        return "; ".join(pairs)
+    except Exception:  # noqa: BLE001
+        return ""
+
+
 def _weibo_web_pages():
-    """无需 cookie：m.weibo.cn 公开时间线（部分出口 IP 可用，GitHub Actions 常被 432/418）。"""
+    """无需账号 cookie：优先用自动访客 Cookie 访问 m.weibo.cn 公开时间线。"""
     referer = "https://m.weibo.cn/u/%d" % WEIBO_UID
     url = ("https://m.weibo.cn/api/container/getIndex?type=uid&value=%d"
            "&containerid=107603%d" % (WEIBO_UID, WEIBO_UID))
+    cookies = [""]
+    vc = _weibo_visitor_cookie()
+    if vc:
+        cookies.insert(0, vc)
     last = None
-    for ua in range(len(UAS)):
-        try:
-            data = http_get_json(url, referer=referer, ua_index=ua)
-            if int(data.get("ok") or 0) != 1:
-                raise RuntimeError("ok=%s" % data.get("ok"))
-            out = []
-            for card in data.get("data", {}).get("cards", []):
-                mb = card.get("mblog")
-                if not mb:
-                    continue
-                ts = parse_weibo_time(mb.get("created_at"))
-                text = re.sub(r"<[^>]+>", "", mb.get("text", ""))
-                out.append(make_item("wb-" + str(mb.get("id", "")), "weibo",
-                                     clean_text(text, 120),
-                                     "https://m.weibo.cn/detail/" + str(mb.get("id", "")),
-                                     ts, re.sub(r"<[^>]+>", " ", mb.get("text", ""))))
-            if out:
-                return out
-            raise RuntimeError("无 mblog")
-        except Exception as e:  # noqa: BLE001
-            last = e
+    for ck in cookies:
+        for ua in range(len(UAS)):
+            try:
+                data = http_get_json(url, referer=referer, ua_index=ua,
+                                     cookie=ck or None)
+                if int(data.get("ok") or 0) != 1:
+                    raise RuntimeError("ok=%s" % data.get("ok"))
+                out = []
+                for card in data.get("data", {}).get("cards", []):
+                    mb = card.get("mblog")
+                    if not mb:
+                        continue
+                    ts = parse_weibo_time(mb.get("created_at"))
+                    text = re.sub(r"<[^>]+>", "", mb.get("text", ""))
+                    out.append(make_item("wb-" + str(mb.get("id", "")), "weibo",
+                                         clean_text(text, 120),
+                                         "https://m.weibo.cn/detail/" + str(mb.get("id", "")),
+                                         ts, re.sub(r"<[^>]+>", " ", mb.get("text", ""))))
+                if out:
+                    return out
+                raise RuntimeError("无 mblog")
+            except Exception as e:  # noqa: BLE001
+                last = e
     raise RuntimeError("公开时间线不可用：%s" % last)
 
 
