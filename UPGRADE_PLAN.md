@@ -63,3 +63,9 @@
 - 真机 HA25G639 验证：设置页「源健康」正确显示各源 ok/耗时/last_success（schema:2 解析 OK）。
 - 已知小瑕疵：relay 兼容字段 `problems` 与 `sources` 同时存在时，App 源健康里会出现重复的失败项（如「中继·B站」与「中继·bili」各一条），仅显示层面，不影响抓取。
 - 待用户配置（可选）：仓库 Secret `WEIBO_COOKIE`；仓库 Variable `RSSHUB_BASE`（抖音/小红书/微博兜底）。
+## 上线后补全（2026-11-12 01:05）
+- **一键脚本修复**：`oneclick.ps1` 目录同步改为「先删后拷」，并清理历史嵌套副本（`.github/workflows/workflows`、`relay/relay` 等）；部署时不再覆盖线上较新的 `docs/feed.json`。
+- **CI 可调**：`relay.yml` 的 workflow_dispatch 支持 `rsshub` / `sources` / `bili_ci` 临时覆盖，便于测试源。
+- **微博/抖音/小红书实测**：4 个公共 RSSHub 实例 + m.weibo.cn 公开时间线（本机与 GitHub Actions）全部被风控（432/403/503/DNS）→ 没有 `WEIBO_COOKIE` / 自建 RSSHub 就无法全绿；详见 `relay/SOURCES.md`。
+- **B 站**：强制 CI 抓取仍 412（已测 bili_ci=1）→ 维持默认跳过，由 App 本地抓、中继保留 stale 条目。
+- **线上 feed 已恢复**：53 条（official 30 + taptap 10 + bili stale 13），App 端正常。

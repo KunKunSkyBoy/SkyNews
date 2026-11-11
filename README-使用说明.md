@@ -70,3 +70,4 @@ powershell -ExecutionPolicy Bypass -File oneclick.ps1 -Action verify
 - 中继源名中文化（官网/TapTap/B站/微博/抖音/小红书）
 - 中继条目的 stale 标记会带进 App（失败源旧条目灰显）
 - 版本 2.6 (8)
+> 各源可用性与配置（微博/抖音/小红书）实测结论见 [`relay/SOURCES.md`](relay/SOURCES.md)。
