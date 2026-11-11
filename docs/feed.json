@@ -1,16 +1,9 @@
 {
  "schema": 2,
- "generated_at": "2026-11-11T18:51:12Z",
- "updated": "2026-11-11T18:51:12Z",
+ "generated_at": "2026-11-11T18:51:50Z",
+ "updated": "2026-11-11T18:51:50Z",
  "count": 54,
  "sources": {
-  "douyin": {
-   "ok": false,
-   "count": 0,
-   "error": "NotConfigured: 未配置 RSSHUB_BASE / SKYNEWS_DOUYIN_ROUTE",
-   "elapsed_ms": 0,
-   "last_success": null
-  },
   "xhs": {
    "ok": false,
    "count": 0,
@@ -26,32 +19,39 @@
    "last_success": "2026-11-11T16:36:31Z",
    "stale": true
   },
+  "douyin": {
+   "ok": false,
+   "count": 0,
+   "error": "NotConfigured: 未配置 RSSHUB_BASE / SKYNEWS_DOUYIN_ROUTE",
+   "elapsed_ms": 0,
+   "last_success": null
+  },
   "daily": {
    "ok": true,
    "count": 1,
    "error": null,
-   "elapsed_ms": 740,
-   "last_success": "2026-11-11T18:50:51Z"
+   "elapsed_ms": 751,
+   "last_success": "2026-11-11T18:51:36Z"
   },
   "official": {
    "ok": true,
    "count": 30,
    "error": null,
-   "elapsed_ms": 1420,
-   "last_success": "2026-11-11T18:50:51Z"
+   "elapsed_ms": 948,
+   "last_success": "2026-11-11T18:51:36Z"
   },
   "taptap": {
    "ok": true,
    "count": 10,
    "error": null,
-   "elapsed_ms": 1699,
-   "last_success": "2026-11-11T18:50:52Z"
+   "elapsed_ms": 1184,
+   "last_success": "2026-11-11T18:51:36Z"
   },
   "weibo": {
    "ok": false,
    "count": 0,
    "error": "NotConfigured: 未配置 WEIBO_COOKIE/RSSHUB_BASE，公开时间线不可用（公开时间线不可用：JSON 解析失败: Expecting value: line 1 column 1 (char 0)）",
-   "elapsed_ms": 13728,
+   "elapsed_ms": 9912,
    "last_success": null
   }
  },
@@ -67,11 +67,11 @@
    "source": "daily",
    "title": "11月12日 每日任务",
    "url": "https://skydaily.nankki.com/",
-   "time": "2026-11-11T18:50:51Z",
+   "time": "2026-11-11T18:51:36Z",
    "summary": "今日每日任务： 1. 拾起一只螃蟹 2. 向一位玩家鞠躬 3. 在水母上回复能量 4. 向一位朋友招手 每日大蜡烛位置：在遇境/云巢里传送门门口处，若有两根小蜡烛在两边，即表示对应的地图里会有大蜡烛堆~ 今日无碎片降落",
    "src": "每日任务",
-   "ts": 1794423051,
-   "t": "11-11 18:50",
+   "ts": 1794423096,
+   "t": "11-11 18:51",
    "text": "11月12日 每日任务\n今日每日任务： 1. 拾起一只螃蟹 2. 向一位玩家鞠躬 3. 在水母上回复能量 4. 向一位朋友招手 每日大蜡烛位置：在遇境/云巢里传送门门口处，若有两根小蜡烛在两边，即表示对应的地图里会有大蜡烛堆~ 今日无碎片降落"
   },
   {
