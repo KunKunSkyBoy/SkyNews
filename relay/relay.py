@@ -1404,6 +1404,46 @@ def write_history(out_dir, data):
         print("history skipped:", e)
 
 
+
+def _t1qq_bytes(ep, key):
+    """应天API 图片接口（带 key）→ 原始字节。"""
+    try:
+        raw = http_get_bytes("https://api.t1qq.com/api/sky/sc/%s?key=%s"
+                             % (ep, urllib.parse.quote(key)), referer="https://api.t1qq.com/")
+        if len(raw) > 512 and raw[:2] in (b"\xff\xd8", b"\x89P", b"GI"):
+            return raw
+    except Exception:  # noqa: BLE001
+        pass
+    return b""
+
+
+def _save_tool_img(img_dir, name, raw, day_tag):
+    """把图片压小后存到 docs/img/<name>，返回相对 URL（Pages 国内可访问，不依赖 GitHub Release）。"""
+    try:
+        os.makedirs(img_dir, exist_ok=True)
+        out = None
+        try:
+            from PIL import Image  # noqa: PLC0415
+            import io as _io
+            im = Image.open(_io.BytesIO(raw))
+            if im.mode not in ("RGB", "L"):
+                im = im.convert("RGB")
+            w, h = im.size
+            if w > 720:
+                im = im.resize((720, max(1, int(h * 720 / w))), Image.LANCZOS)
+            path = os.path.join(img_dir, name + ".jpg")
+            im.save(path, "JPEG", quality=68, optimize=True)
+            out = path
+        except Exception:  # noqa: BLE001
+            ext = ".png" if raw[:4] == b"\x89PNG" else (".gif" if raw[:4] == b"GIF8" else ".jpg")
+            out = os.path.join(img_dir, name + ext)
+            with open(out, "wb") as f:
+                f.write(raw)
+        return "img/" + os.path.basename(out) + "?d=" + day_tag
+    except Exception:  # noqa: BLE001
+        return ""
+
+
 def write_tools_html(out_dir, data):
     """生成 docs/tools.html：所有免费光遇工具（文字 + 图片），按天缓存。"""
     key = _t1qq_key()
@@ -1443,7 +1483,9 @@ def write_tools_html(out_dir, data):
                              "<br/>".join(html_mod.escape(x) for x in cal_lines), []))
     except Exception:  # noqa: BLE001
         pass
-    # 红石天气图片（keyless URL）
+    # 红石天气图片（保存到 docs/img，Pages 提供，国内可访问）
+    img_dir = os.path.join(out_dir, "img")
+    day_tag = today.replace("-", "")
     gytq_imgs = []
     try:
         d = http_get_json("https://api.t1qq.com/api/sky/gytq?key=" + urllib.parse.quote(key),
@@ -1451,18 +1493,23 @@ def write_tools_html(out_dir, data):
         for u in (d.get("data") or [])[:2]:
             if u.startswith("http"):
                 try:
-                    gytq_imgs.append(_img_src(http_get_bytes(u), "gytq_%d.png" % len(gytq_imgs)))
+                    rel = _save_tool_img(img_dir, "gytq_%d" % len(gytq_imgs),
+                                         http_get_bytes(u), day_tag)
+                    if rel:
+                        gytq_imgs.append(rel)
                 except Exception:  # noqa: BLE001
                     pass
     except Exception:  # noqa: BLE001
         pass
     sections.append(("gytq", "红石/黑石天气", "来自应天API 的天气图（每日更新）", gytq_imgs))
-    # 图片类
+    # 图片类（保存到 docs/img）
     for ep, title in [("scjl", "季节蜡烛位置图"), ("scdl", "大蜡烛位置图"),
                       ("scfk", "复刻先祖位置图"), ("hdrl", "活动日历图")]:
-        uri = _t1qq_img(ep, key)
-        if uri:
-            sections.append((ep, title, "", [uri]))
+        raw = _t1qq_bytes(ep, key)
+        if raw:
+            rel = _save_tool_img(img_dir, "sc_" + ep, raw, day_tag)
+            if rel:
+                sections.append((ep, title, "", [rel]))
 
     img_sections = sum(1 for _, _, _, im in sections if im)
     old_path = os.path.join(out_dir, "tools.html")
