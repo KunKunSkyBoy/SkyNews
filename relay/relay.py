@@ -1379,6 +1379,62 @@ def _t1qq_img(ep, key):
 
 
 
+
+# ============================================================ 明日任务（独角兽 API）
+def _mrrw_key():
+    for name in ("SKYNEWS_MRRW_KEY", "SKYNEWS_DAILY_KEY"):
+        v = (os.environ.get(name) or "").strip()
+        if v:
+            return v
+    return ""
+
+
+def write_tomorrow(out_dir):
+    """抓独角兽 API 的「今日+明日」任务排期 → <out>/tomorrow.json。
+
+    为什么放在中继：
+      * 该 API 免费额度只有 3 次/天，App 直连很快烧穿；
+      * key 存 GitHub Secrets，不进 APK；
+      * 全用户共享一份静态文件，读多少次都不耗额度。
+    失败时不写文件（atomic_write 在成功时才落盘），旧文件继续服务；
+    App 端会校验 tomorrow 的日期，过期就回退。
+    """
+    key = _mrrw_key()
+    if not key:
+        raise NotConfigured("未配置 SKYNEWS_MRRW_KEY（独角兽 API 密钥）")
+    url = "https://ovoav.com/api/sky/mrrw/rw?key=" + key
+    raw = http_get(url, timeout=15)
+    d = json.loads(raw)
+    if int(d.get("code") or 0) != 200:
+        raise RuntimeError("独角兽 API code=%s msg=%s" % (d.get("code"), d.get("msg")))
+    tl = (d.get("data") or {}).get("task_list") or []
+    by_date = {}
+    for it in tl:
+        day = (it.get("date") or "").strip()
+        cn = (it.get("quest_cn") or "").strip()
+        if not day or not cn:
+            continue
+        by_date.setdefault(day, []).append({
+            "date": day,
+            "quest_id": (it.get("quest_id") or "").strip(),
+            "quest_cn": cn,
+        })
+    days = sorted(by_date)
+    payload = {
+        "schema": 1,
+        "generated_at": now_iso(),
+        "today_date": days[0] if days else "",
+        "tomorrow_date": days[1] if len(days) > 1 else "",
+        "today": by_date.get(days[0], []) if days else [],
+        "tomorrow": by_date.get(days[1], []) if len(days) > 1 else [],
+        "raw_count": len(tl),
+    }
+    os.makedirs(out_dir, exist_ok=True)
+    atomic_write(os.path.join(out_dir, "tomorrow.json"),
+                 json.dumps(payload, ensure_ascii=False, indent=1))
+    return payload
+
+
 def write_history(out_dir, data):
     """把每天第一次抓到的数据落一份到 docs/history/YYYY-MM-DD.json（自建存档，~按天增长）。"""
     try:
@@ -1602,6 +1658,13 @@ def main(argv=None):
         write_calendar_ics(args.out)
     except Exception as e:  # noqa: BLE001
         print("calendar.ics skipped:", e)
+    try:
+        tw = write_tomorrow(args.out)
+        print("tomorrow: today=%d tomorrow=%d (%s) → %s" % (
+            len(tw["today"]), len(tw["tomorrow"]), tw["tomorrow_date"],
+            os.path.join(args.out, "tomorrow.json")))
+    except Exception as e:  # noqa: BLE001
+        print("tomorrow skipped:", e)
     if args.show:
         print_summary(data)
 
