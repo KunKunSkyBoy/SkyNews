@@ -41,10 +41,10 @@ bash /storage/emulated/0/MT2/mcp/SkyNews/build.sh
 
 | 源 | 实现 | 登录 | 实测 |
 |---|---|---|---|
-| TapTap 官方帖 | `www.taptap.cn/webapiv2/feed/v7/by-group?group_id=47615&type=official`（必须带 `X-UA`，缺了 400） | 不需要 | 200，官方帖 total **2670**，每次 10 条（社区官方号「Sky光·遇」） |
-| 官网新闻 | `sixhorse.game.163.com/news/outer/newslist_search.do` JSON | 不需要 | 200，30 条/次 |
-| B 站官方 | `api.bilibili.com/x/polymer/web-dynamic/v1/feed/space` + WBI 签名 + `buvid3`+`buvid4` 访客 cookie | 不需要 | 200，26 条/次（mid `211700578` 光遇手游，认证 2.6M 粉） |
-| 公告正文 | `ma75.update.netease.com/.../announcement_live.json` | 不需要 | 已有的公告源，合并进时间线 |
+| TapTap 官方帖 | `TapTap 官方社区号接口（路径略）`（必须带 `X-UA`，缺了 400） | 不需要 | 200，官方帖 total **2670**，每次 10 条（社区官方号「Sky光·遇」） |
+| 官网新闻 | `官网新闻列表接口（路径略）` JSON | 不需要 | 200，30 条/次 |
+| B 站官方 | `B 站空间动态接口（路径略）` + WBI 签名 + `buvid3`+`buvid4` 访客 cookie | 不需要 | 200，26 条/次（mid `211700578` 光遇手游，认证 2.6M 粉） |
+| 公告正文 | `网易公告接口（路径略）` | 不需要 | 已有的公告源，合并进时间线 |
 
 WBI 签名（B 站 2023 起空间接口必需）在 `MainActivity.wbiQuery()` 里实现：取 `nav` 的 `wbi_img`
 的 img/sub key，按固定置换表拼 mixinKey，参数排序 + `wts` 后 md5 得 `w_rid`。签名与请求都已在
@@ -59,10 +59,10 @@ JDK 17 上跑过同一份代码做验证（200 / `code:0` / 26 items）。
 
 | 平台 | 现象 | 原因 |
 |---|---|---|
-| 微博 `m.weibo.cn/api/...`（官方 UID **6355968578**，即 weibo.com/skygy） | HTTP **432**（带浏览器 UA/Referer、拿过访客 SUBP cookie 也一样） | 运营商出口 IP 被微博风控；`weibo.com/ajax/statuses/mymblog` 带匿名 cookie 也是 403「请登录后使用」 |
-| 微博 `weibo.cn` / `m.weibo.cn/u/...` | 200 但返回「登录 / Sina Visitor System」 | 需要登录态 |
-| 抖音 | `aweme/v1/web/user/profile/other/` 200 但 0 字节，页面是 `_$jsvmprt` JS 壳 | 需要 a_bogus / ttwid 签名 |
-| 小红书 | `edith.xiaohongshu.com/api/sns/web/v1/user_posted` → **406** `{"code":-1}` | 需要 x-s/x-t + a1 签名 |
+| 微博 `微博移动端接口（路径略）`（官方 UID **6355968578**，即 官方微博主页） | HTTP **432**（带浏览器 UA/Referer、拿过访客 SUBP cookie 也一样） | 运营商出口 IP 被微博风控；`微博时间线接口（路径略）` 带匿名 cookie 也是 403「请登录后使用」 |
+| 微博 移动端网页与用户页（地址略） | 200 但返回「登录 / Sina Visitor System」 | 需要登录态 |
+| 抖音 | `抖音用户接口（路径略）` 200 但 0 字节，页面是 `_$jsvmprt` JS 壳 | 需要 a_bogus / ttwid 签名 |
+| 小红书 | `小红书用户笔记接口（路径略）` → **406** `{"code":-1}` | 需要 x-s/x-t + a1 签名 |
 | 微信公众号 | 搜狗微信搜索 200 但「暂无相关官方认证订阅号」 | 无公开 feed |
 | 公共 RSSHub 实例（rsshub.app 等 9 个） | 000 / 503 | 本机网络不可达 |
 
@@ -88,7 +88,7 @@ JDK 17 上跑过同一份代码做验证（200 / `code:0` / 26 items）。
 ### 工具（v4.0 / v4.1）
 - 9 个入口：每日任务 / 今日速览 / 红石天气 / 季节蜡烛图 / 大蜡烛图 / 复刻先祖 / 活动日历 / 每日任务位置图 / 季节倒计时。
 - 点按钮在 App 内打开，**支持图片显示**（季蜡 / 大蜡 / 复刻 / 日历 / 天气图）。
-- **近期日程**：接 `sky-ics.pages.dev` 日历，未来 10 天红石时间 + 复刻先祖离开时间；「今日速览」自动追加最近 3 条日程。
+- **近期日程**：接 `第三方光遇日历源（地址略）` 日历，未来 10 天红石时间 + 复刻先祖离开时间；「今日速览」自动追加最近 3 条日程。
 
 ### 提醒与后台
 - **刷新**：手动抓取；启动时自动抓一次。
@@ -103,7 +103,7 @@ JDK 17 上跑过同一份代码做验证（200 / `code:0` / 26 items）。
 **主源 = 官网列表页 JS 里调用的 JSON 接口**（比 HTML 列表更早、更准）：
 
 ```
-https://sixhorse.game.163.com/news/outer/newslist_search.do?start=1&limit=40&contentkind=26689,26690,26691,29298
+官网新闻列表 JSON 接口（地址略）
 ```
 
 - 返回 `{result:[{code,title,url,showtime,updateTime,...}],count:685}`，`showtime` 是**毫秒级时间戳**
@@ -113,8 +113,8 @@ https://sixhorse.game.163.com/news/outer/newslist_search.do?start=1&limit=40&con
 
 **兜底 = HTML 列表页**（接口挂了才走）：
 
-1. 取 `https://sky.163.com/news/`（首页）与 `index_2.html`（第二页）
-2. 正则抽 `<a href="//sky.163.com/news/{official|update|activity|strategy}/{YYYYMMDD}/{id}.html">` 块
+1. 取 `官网新闻页（地址略）`（首页）与 `index_2.html`（第二页）
+2. 正则抽 `<a href="//官网/news/{栏目}/{日期}/{id}.html">` 块
 3. 块内 `<div class="text"><div>日期</div><div>标题</div><div>摘要</div>`
 4. 以最后一段 `id` 去重，与已读集合比对得出新条目
 
@@ -129,8 +129,8 @@ https://sixhorse.game.163.com/news/outer/newslist_search.do?start=1&limit=40&con
 - 源：TapTap / 官网 / B 站（零配置）· 微博（`WEIBO_COOKIE`）· 抖音/小红书/微博兜底（`RSSHUB_BASE`）
 - 本地实测：**53 条**（官网 30 + B 站 13 + TapTap 10）；没配的源只写进 `problems`，不影响其它源
 - GitHub Actions 上实测：官网/TapTap 正常，**B 站返回 412**（境外 IP 被 B 站地域拦截）——B 站条目由 App 本地抓，中继里缺它不影响
-- App 端：设置 → **云中继地址** 填 `https://<user>.github.io/<repo>/feed.json`，条目以「中继」来源并入
-- **已部署实例**：<https://kunkunskyboy.github.io/SkyNews/feed.json>（GitHub Pages，App v2.4 起默认用它）
+- App 端：设置 → **云中继地址** 填 `自己的 Pages 地址（略）`，条目以「中继」来源并入
+- **已部署实例**：云中继 feed（地址略）（GitHub Pages，App v2.4 起默认用它）
 - App 端按 id 去重：中继里的官网/TapTap/B站条目与本地抓到的同 id 条目只保留一条
 
 部署步骤见 [`relay/README.md`](relay/README.md)。
@@ -142,13 +142,13 @@ https://sixhorse.game.163.com/news/outer/newslist_search.do?start=1&limit=40&con
 
 | 项目 | 覆盖 | 依赖 | 备注 |
 |---|---|---|---|
-| [RSSHub](https://github.com/DIYgod/RSSHub) | 微博 / B 站 / 小红书 / 抖音 / TapTap 等上百站点 | **AGPL-3.0**，46.9k★；weibo/user 需 `WEIBO_COOKIES`+Puppeteer，bilibili/user/dynamic 需 `BILIBILI_COOKIE_*`+Puppeteer，小红书/抖音需 cookie/浏览器；`taptap/topic` 零配置 | 最通用；公共 rsshub.app 本网络 30s×3 全超时，只能自建 |
-| [crawl4weibo](https://github.com/Praeviso/crawl4weibo) | 微博用户时间线 | MIT，44★；默认 Playwright 取 cookie | 轻量爬虫 |
-| [@hkai-ai/weibo-api](https://www.npmjs.com/package/@hkai-ai/weibo-api) | 微博（封装 m.weibo.cn） | MIT，npm 1.1.7，2025-06 后停更；需 cookie | 直接对应我们被 432 的那个接口 |
-| [bilibili-api-python](https://github.com/Nemo2011/bilibili-api) | B 站（含 WBI 签名） | 4,155★，**2026-07-06 已归档**；需 cookie | 我们手写的 WBI 与它同源 |
-| [nonebot-plugin-bilidyn](https://pypi.org/project/nonebot-plugin-bilidyn/) | B 站 UP 主动态订阅 | PyPI 0.4.1，原 GitHub 仓库已 404 | 已失效，仅作参考 |
-| [koishi-plugin-sky-renwu-weibo](https://gitee.com/vincent-zyu/koishi-plugin-sky-renwu-weibo) | 光遇国服每日任务（抓微博博主） | 2★，2026-11 仍更新 | 光遇社区先例，但抓的是个人号不是官方号 |
-| [RSSHub Radar](https://github.com/DIYgod/RSSHub-Radar) | 发现站点 RSS | 浏览器扩展 | 找源用 |
+| RSSHub | 微博 / B 站 / 小红书 / 抖音 / TapTap 等上百站点 | **AGPL-3.0**，46.9k★；weibo/user 需 `WEIBO_COOKIES`+Puppeteer，bilibili/user/dynamic 需 `BILIBILI_COOKIE_*`+Puppeteer，小红书/抖音需 cookie/浏览器；`taptap/topic` 零配置 | 最通用；公共 rsshub.app 本网络 30s×3 全超时，只能自建 |
+| crawl4weibo | 微博用户时间线 | MIT，44★；默认 Playwright 取 cookie | 轻量爬虫 |
+| @hkai-ai/weibo-api | 微博（封装 移动端网页） | MIT，npm 1.1.7，2025-06 后停更；需 cookie | 直接对应我们被 432 的那个接口 |
+| bilibili-api-python | B 站（含 WBI 签名） | 4,155★，**2026-07-06 已归档**；需 cookie | 我们手写的 WBI 与它同源 |
+| nonebot-plugin-bilidyn | B 站 UP 主动态订阅 | PyPI 0.4.1，原 GitHub 仓库已 404 | 已失效，仅作参考 |
+| koishi-plugin-sky-renwu-weibo | 光遇国服每日任务（抓微博博主） | 2★，2026-11 仍更新 | 光遇社区先例，但抓的是个人号不是官方号 |
+| RSSHub Radar | 发现站点 RSS | 浏览器扩展 | 找源用 |
 
 结论：**TapTap（零配置）、B 站（WBI）、官网接口可以在手机端直接抓；微博/抖音/小红书不行**——它们
 要么风控 IP、要么要签名/登录。要「全网」，正确做法是自建 RSSHub/GitHub Actions 中继，App 只拉 RSS。
@@ -200,7 +200,7 @@ https://sixhorse.game.163.com/news/outer/newslist_search.do?start=1&limit=40&con
 - 设置页：每日任务提醒（开关 + 时间，免打扰兼容）。
 
 ## v3.1 每日任务免费推送（2026-11-12）
-- 数据源换成 `skydaily.nankki.com` 公开 API（免费，无需注册 / 密钥）。
+- 数据源换成 `每日任务数据接口（地址略）` 公开 API（免费，无需注册 / 密钥）。
 - 动态页出现「X月X日 每日任务」卡片（4 个任务 + 大蜡烛位置）。
 - 设置里开「每日任务提醒」，到点通知直接显示今日任务内容。
 - 修复：中继时间戳单位（秒 → 毫秒）导致排序错误。
@@ -209,11 +209,11 @@ https://sixhorse.game.163.com/news/outer/newslist_search.do?start=1&limit=40&con
 ## v4.0 光遇工具箱（2026-11-12）
 - 新增「工具」页：9 个独立按钮（每日任务 / 今日速览 / 红石天气 / 季节蜡烛图 / 大蜡烛图 / 复刻先祖 / 活动日历 / 每日任务位置图 / 季节倒计时）。
 - 点按钮在 App 内打开，**支持图片显示**（季蜡 / 大蜡 / 复刻 / 日历 / 天气图）。
-- 数据全部来自免费公开源：`skydaily.nankki.com` + 应天 API + oivio。
+- 数据全部来自免费公开源：`每日任务数据接口（地址略）` + 应天 API + oivio。
 - 图片托管在 GitHub Release（不占仓库体积、每日自动更新）。
 
 ## v4.1 近期日程（2026-11-12）
-- 接入 `sky-ics.pages.dev` 免费日历（红石 / 黑石 / 活动 / 旅行先祖 / 赛季）。
+- 接入 `第三方光遇日历源（地址略）` 免费日历（红石 / 黑石 / 活动 / 旅行先祖 / 赛季）。
 - 工具页新增「近期日程」按钮：未来 10 天红石时间、复刻先祖离开时间。
 - 「今日速览」自动追加最近 3 条日程。
 - `tools.html` 新增日程板块，`docs/calendar.ics` 提供日历订阅入口。
@@ -224,5 +224,5 @@ https://sixhorse.game.163.com/news/outer/newslist_search.do?start=1&limit=40&con
 
 - versionName **4.1** / versionCode **16**（`com.dsh.skynews`，minSdk 26 / targetSdk 32）
 - 构建产物：`skynews.apk`、`dist/`
-- 数据来源：`app/assets/sky/` 静态快照（物品 / 先祖 / 每日任务 / 世界任务 / 赛季 / 活动）；动态走 relay（`docs/feed.json`）；日程走 `sky-ics.pages.dev/calendar.ics`
-- 工具页入口：`https://kunkunskyboy.github.io/SkyNews/tools.html#<key>`（`daily` / `extra` / `calendar` / `gytq` / `scjl` / `scdl` / `scfk` / `hdrl` / `djs`）
+- 数据来源：`app/assets/sky/` 静态快照（物品 / 先祖 / 每日任务 / 世界任务 / 赛季 / 活动）；动态走 relay（`docs/feed.json`）；日程走 `第三方光遇日历 ICS 源（地址略）`
+- 工具页入口：`工具页（Pages 托管，地址略）`（`daily` / `extra` / `calendar` / `gytq` / `scjl` / `scdl` / `scfk` / `hdrl` / `djs`）
