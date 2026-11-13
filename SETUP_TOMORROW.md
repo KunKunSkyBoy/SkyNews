@@ -18,9 +18,9 @@ GitHub Pages  https://kunkunskyboy.github.io/SkyNews/tomorrow.json
         │  静态文件，读多少次都不耗额度、不带 key
         ▼
 App (SkyPanel.fetchTomorrow)
-        ① 本地缓存命中 → 直接用
-        ② 读中继静态文件 → 主路径
-        ③ 直连 API（一天最多一次）→ 兜底
+        ① 本地缓存命中（mrrw_date == 明天 && mrrw_day == 今天）→ 直接用
+        ② 读中继静态文件 → 唯一网络来源，无限次
+        （App 不直连 API：3 次/天的额度只留给中继）
 ```
 
 关键点：**API 密钥只在 GitHub Actions 里出现**，不进 APK、不进网页。
@@ -92,15 +92,17 @@ App 端 `fromRelay()` 会校验 `tomorrow_date` **必须等于本机算出的明
 ## 6. App 端三级回退
 
 ```java
-if (mrrw_date == 明天 && mrrw_day == 今天) return;   // ① 缓存
-if (fromRelay(sp, tmr, today)) return;              // ② 中继静态文件
-if (mrrw_direct_day == 今天) return;                 // ③ 直连每天只许一次
-fromApi(sp, tmr, today);
+if (mrrw_date == 明天 && mrrw_day == 今天) return;   // ① 缓存命中，不发请求
+fromRelay(sp, tmr, today);                          // ② 读中继静态文件（唯一网络来源）
 ```
 
-缓存键：`mrrw`（任务名 JSON 数组）、`mrrw_date`（该数据对应日期）、`mrrw_day`（拉取当天）、`mrrw_direct_day`（直连兜底当天）、`mrrw_ts`（时间戳，仅诊断用）。
+缓存键：`mrrw`（任务名 JSON 数组）、`mrrw_date`（该数据对应日期）、`mrrw_day`（拉取当天）、`mrrw_ts`（时间戳，仅诊断用）。
 
-三级全失败时明日段显示「排期获取中 · 点右上角刷新后更新 · 以下为任务池参考」，并回落到任务池卡片——**不拿假数据冒充真排期**。
+读取失败（404 / 日期不符 / 网络错）时明日段显示「排期获取中 · 点右上角刷新后更新 · 以下为任务池参考」，并回落到任务池卡片——**不拿假数据冒充真排期**。
+
+> 早期版本里还有一层「直连 API 兜底」，已在 4.1 后续构建中移除：
+> 该接口额度全局共享，App 与中继同时直连会互相抢额度（中继的 `.mrrw-date` 计数也统计不到 App 的消耗），
+> 结果两边都拿不到数据。现在额度只归中继，App 侧零额度消耗、APK 内也不再含密钥。
 
 ## 7. 轮换密钥
 
@@ -115,6 +117,7 @@ fromApi(sp, tmr, today);
 - **上游是人工维护的**（其产品目录写的是「光遇任务合集（数据来源游离）」），可能晚于游戏实际更新，也可能偶发文案错字——这不是 bug，是数据源特性。
 - **只覆盖两天。** 接口本身只返回今天和明天，没有更远的排期，App 里「后天」只能用任务池参考。
 - **`.mrrw-date` 是单点状态。** 手动触发 workflow 也会消耗计数；调试时请用假 key（会返回 403 且不计额度）验证逻辑，别拿真 key 反复试。
+- **中继是单点。** 直连兜底移除后，若 relay 长期失败（Secret 失效、API 改地址），明日段会一直显示任务池参考，没有第二条网络来源。换 key 流程见第 7 节。
 
 ## 9. 排查
 
