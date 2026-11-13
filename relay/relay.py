@@ -1389,16 +1389,59 @@ def _mrrw_key():
     return ""
 
 
+def _bj_now():
+    """北京时间（额度按国内 0 点刷新，用 UTC+8 对齐）。"""
+    return datetime.now(timezone.utc) + timedelta(hours=8)
+
+
+def _mrrw_tries(out_dir):
+    """今天已尝试次数（记录在 <out>/.mrrw-date，随仓库提交持久化）。"""
+    p = os.path.join(out_dir, ".mrrw-date")
+    try:
+        with open(p, encoding="utf-8") as f:
+            parts = f.read().split()
+        if len(parts) == 2 and parts[0] == _bj_now().date().isoformat():
+            return int(parts[1])
+    except Exception:
+        pass
+    return 0
+
+
 def write_tomorrow(out_dir):
     """抓独角兽 API 的「今日+明日」任务排期 → <out>/tomorrow.json。
 
     为什么放在中继：
-      * 该 API 免费额度只有 3 次/天，App 直连很快烧穿；
+      * 该 API 免费额度只有 3 次/天（总 15/月 10），App 直连很快烧穿；
       * key 存 GitHub Secrets，不进 APK；
       * 全用户共享一份静态文件，读多少次都不耗额度。
-    失败时不写文件（atomic_write 在成功时才落盘），旧文件继续服务；
+
+    省额度策略（本函数被 relay 每 10 分钟调一次，必须自己限流）：
+      1. 今日已抓到且覆盖明天 → 直接跳过，不发请求；
+      2. 今日尝试次数 ≥ 3（免费额度）→ 跳过；
+      3. 每次真请求前先 +1 落盘，因此失败也不会无限重试。
+    失败时不写 tomorrow.json（atomic_write 仅在成功时落盘），旧文件继续服务；
     App 端会校验 tomorrow 的日期，过期就回退。
     """
+    path = os.path.join(out_dir, "tomorrow.json")
+    today = _bj_now().date().isoformat()
+    tmr = (_bj_now() + timedelta(days=1)).date().isoformat()
+
+    if os.path.exists(path):
+        try:
+            with open(path, encoding="utf-8") as f:
+                old = json.load(f)
+            if old.get("tomorrow_date") == tmr and old.get("fetched_day") == today:
+                print("tomorrow: 今日已抓取（%s），跳过请求" % today)
+                return None
+        except Exception:
+            pass
+
+    tries = _mrrw_tries(out_dir)
+    if tries >= 3:
+        print("tomorrow: 今日已尝试 %d 次（免费额度 3 次/天），跳过" % tries)
+        return None
+    atomic_write(os.path.join(out_dir, ".mrrw-date"), "%s %d" % (today, tries + 1))
+
     key = _mrrw_key()
     if not key:
         raise NotConfigured("未配置 SKYNEWS_MRRW_KEY（独角兽 API 密钥）")
@@ -1423,6 +1466,7 @@ def write_tomorrow(out_dir):
     payload = {
         "schema": 1,
         "generated_at": now_iso(),
+        "fetched_day": today,
         "today_date": days[0] if days else "",
         "tomorrow_date": days[1] if len(days) > 1 else "",
         "today": by_date.get(days[0], []) if days else [],
@@ -1430,8 +1474,7 @@ def write_tomorrow(out_dir):
         "raw_count": len(tl),
     }
     os.makedirs(out_dir, exist_ok=True)
-    atomic_write(os.path.join(out_dir, "tomorrow.json"),
-                 json.dumps(payload, ensure_ascii=False, indent=1))
+    atomic_write(path, json.dumps(payload, ensure_ascii=False, indent=1))
     return payload
 
 
