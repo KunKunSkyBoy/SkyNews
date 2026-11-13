@@ -1,0 +1,52 @@
+{
+ "schema": 1,
+ "generated_at": "2026-11-13T18:40:47Z",
+ "fetched_day": "2026-11-14",
+ "today_date": "2026-11-14",
+ "tomorrow_date": "2026-11-15",
+ "today": [
+  {
+   "date": "2026-11-14",
+   "quest_id": "bow_at_a_player",
+   "quest_cn": "向一位玩家鞠躬"
+  },
+  {
+   "date": "2026-11-14",
+   "quest_id": "high_five_someone",
+   "quest_cn": "和朋友击掌"
+  },
+  {
+   "date": "2026-11-14",
+   "quest_id": "shoute_at_5_crabs",
+   "quest_cn": "掀翻5只螃蟹"
+  },
+  {
+   "date": "2026-11-14",
+   "quest_id": "lightseeker3_night_shelter",
+   "quest_cn": "在禁阁的庇护所中捕捉浮动的光点"
+  }
+ ],
+ "tomorrow": [
+  {
+   "date": "2026-11-15",
+   "quest_id": "light_20_candles",
+   "quest_cn": "点燃20根蜡烛"
+  },
+  {
+   "date": "2026-11-15",
+   "quest_id": "wave_at_a_friend",
+   "quest_cn": "向一位朋友招手"
+  },
+  {
+   "date": "2026-11-15",
+   "quest_id": "melt_10_darkstones",
+   "quest_cn": "净化10株黑暗植物"
+  },
+  {
+   "date": "2026-11-15",
+   "quest_id": "recharge_by_jellyfish",
+   "quest_cn": "在水母上恢复能量"
+  }
+ ],
+ "raw_count": 8
+}
