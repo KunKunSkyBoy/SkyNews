@@ -1,13 +1,112 @@
 [
   {
     "enabled": true,
-    "id": "wiki-traveling_spirit-旅行先祖：奔离旅行者-1112",
+    "id": "wiki-traveling_spirit-旅行先祖：火花家长-0108",
     "type": "traveling_spirit",
-    "title": "【复刻】奔离旅行者",
-    "start": "2026-11-11T22:00:00.000Z",
-    "end": "2026-11-16T04:00:00.000Z",
+    "title": "【复刻】火花家长",
+    "start": "2026-01-07T22:00:00.000Z",
+    "end": "2026-01-12T04:00:00.000Z",
     "source": "wiki",
-    "wikiUrl": "https://wiki.biligame.com/sky/%E6%97%85%E8%A1%8C%E5%85%88%E7%A5%96%EF%BC%9A%E5%A5%94%E7%A6%BB%E6%97%85%E8%A1%8C%E8%80%85",
+    "wikiUrl": "https://wiki.biligame.com/sky/%E6%97%85%E8%A1%8C%E5%85%88%E7%A5%96%EF%BC%9A%E7%81%AB%E8%8A%B1%E5%AE%B6%E9%95%BF",
+    "_source": "wiki"
+  },
+  {
+    "enabled": true,
+    "id": "wiki-traveling_spirit-旅行先祖：踏舞孩童-0122",
+    "type": "traveling_spirit",
+    "title": "【复刻】踏舞孩童",
+    "start": "2026-01-21T22:00:00.000Z",
+    "end": "2026-01-26T04:00:00.000Z",
+    "source": "wiki",
+    "wikiUrl": "https://wiki.biligame.com/sky/%E6%97%85%E8%A1%8C%E5%85%88%E7%A5%96%EF%BC%9A%E8%B8%8F%E8%88%9E%E5%AD%A9%E7%AB%A5",
+    "_source": "wiki"
+  },
+  {
+    "enabled": true,
+    "id": "wiki-traveling_spirit-旅行先祖：跳舞艺人-0205",
+    "type": "traveling_spirit",
+    "title": "【复刻】跳舞艺人",
+    "start": "2026-02-04T22:00:00.000Z",
+    "end": "2026-02-09T04:00:00.000Z",
+    "source": "wiki",
+    "wikiUrl": "https://wiki.biligame.com/sky/%E6%97%85%E8%A1%8C%E5%85%88%E7%A5%96%EF%BC%9A%E8%B7%B3%E8%88%9E%E8%89%BA%E4%BA%BA",
+    "_source": "wiki"
+  },
+  {
+    "enabled": true,
+    "id": "wiki-traveling_spirit-旅行先祖：夜行鸟语者-0214",
+    "type": "traveling_spirit",
+    "title": "【复刻】夜行鸟语者",
+    "start": "2026-02-11T22:00:00.000Z",
+    "end": "2026-02-16T04:00:00.000Z",
+    "source": "wiki",
+    "wikiUrl": "https://wiki.biligame.com/sky/%E6%97%85%E8%A1%8C%E5%85%88%E7%A5%96%EF%BC%9A%E5%A4%9C%E8%A1%8C%E9%B8%9F%E8%AF%AD%E8%80%85",
+    "_source": "wiki"
+  },
+  {
+    "enabled": true,
+    "id": "wiki-traveling_spirit-旅行先祖：彩纸表亲-0219",
+    "type": "traveling_spirit",
+    "title": "【复刻】彩纸表亲",
+    "start": "2026-02-18T22:00:00.000Z",
+    "end": "2026-02-23T04:00:00.000Z",
+    "source": "wiki",
+    "wikiUrl": "https://wiki.biligame.com/sky/%E6%97%85%E8%A1%8C%E5%85%88%E7%A5%96%EF%BC%9A%E5%BD%A9%E7%BA%B8%E8%A1%A8%E4%BA%B2",
+    "_source": "wiki"
+  },
+  {
+    "enabled": true,
+    "id": "wiki-traveling_spirit-旅行先祖：赞许壁画家-0305",
+    "type": "traveling_spirit",
+    "title": "【复刻】赞许壁画家",
+    "start": "2026-03-04T22:00:00.000Z",
+    "end": "2026-03-09T04:00:00.000Z",
+    "source": "wiki",
+    "wikiUrl": "https://wiki.biligame.com/sky/%E6%97%85%E8%A1%8C%E5%85%88%E7%A5%96%EF%BC%9A%E8%B5%9E%E8%AE%B8%E5%A3%81%E7%94%BB%E5%AE%B6",
+    "_source": "wiki"
+  },
+  {
+    "enabled": true,
+    "id": "wiki-traveling_spirit-旅行先祖：细心矿工-0319",
+    "type": "traveling_spirit",
+    "title": "【复刻】细心矿工",
+    "start": "2026-03-18T22:00:00.000Z",
+    "end": "2026-03-23T04:00:00.000Z",
+    "source": "wiki",
+    "wikiUrl": "https://wiki.biligame.com/sky/%E6%97%85%E8%A1%8C%E5%85%88%E7%A5%96%EF%BC%9A%E7%BB%86%E5%BF%83%E7%9F%BF%E5%B7%A5",
+    "_source": "wiki"
+  },
+  {
+    "enabled": true,
+    "id": "wiki-traveling_spirit-旅行先祖：威严舰长-0402",
+    "type": "traveling_spirit",
+    "title": "【复刻】威严舰长",
+    "start": "2026-04-01T22:00:00.000Z",
+    "end": "2026-04-06T04:00:00.000Z",
+    "source": "wiki",
+    "wikiUrl": "https://wiki.biligame.com/sky/%E6%97%85%E8%A1%8C%E5%85%88%E7%A5%96%EF%BC%9A%E5%A8%81%E4%B8%A5%E8%88%B0%E9%95%BF",
+    "_source": "wiki"
+  },
+  {
+    "enabled": true,
+    "id": "wiki-traveling_spirit-旅行先祖：母语者-0416",
+    "type": "traveling_spirit",
+    "title": "【复刻】母语者",
+    "start": "2026-04-15T22:00:00.000Z",
+    "end": "2026-04-20T04:00:00.000Z",
+    "source": "wiki",
+    "wikiUrl": "https://wiki.biligame.com/sky/%E6%97%85%E8%A1%8C%E5%85%88%E7%A5%96%EF%BC%9A%E6%AF%8D%E8%AF%AD%E8%80%85",
+    "_source": "wiki"
+  },
+  {
+    "enabled": true,
+    "id": "wiki-traveling_spirit-旅行先祖：火先知-0430",
+    "type": "traveling_spirit",
+    "title": "【复刻】火先知",
+    "start": "2026-04-29T22:00:00.000Z",
+    "end": "2026-05-04T04:00:00.000Z",
+    "source": "wiki",
+    "wikiUrl": "https://wiki.biligame.com/sky/%E6%97%85%E8%A1%8C%E5%85%88%E7%A5%96%EF%BC%9A%E7%81%AB%E5%85%88%E7%9F%A5",
     "_source": "wiki"
   },
   {
