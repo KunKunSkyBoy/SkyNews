@@ -1,32 +1,10 @@
 {
  "schema": 1,
- "generated_at": "2026-11-13T18:40:47Z",
- "fetched_day": "2026-11-14",
- "today_date": "2026-11-14",
- "tomorrow_date": "2026-11-15",
+ "generated_at": "2026-11-14T16:59:46Z",
+ "fetched_day": "2026-11-15",
+ "today_date": "2026-11-15",
+ "tomorrow_date": "2026-11-16",
  "today": [
-  {
-   "date": "2026-11-14",
-   "quest_id": "bow_at_a_player",
-   "quest_cn": "向一位玩家鞠躬"
-  },
-  {
-   "date": "2026-11-14",
-   "quest_id": "high_five_someone",
-   "quest_cn": "和朋友击掌"
-  },
-  {
-   "date": "2026-11-14",
-   "quest_id": "shoute_at_5_crabs",
-   "quest_cn": "掀翻5只螃蟹"
-  },
-  {
-   "date": "2026-11-14",
-   "quest_id": "lightseeker3_night_shelter",
-   "quest_cn": "在禁阁的庇护所中捕捉浮动的光点"
-  }
- ],
- "tomorrow": [
   {
    "date": "2026-11-15",
    "quest_id": "light_20_candles",
@@ -46,6 +24,28 @@
    "date": "2026-11-15",
    "quest_id": "recharge_by_jellyfish",
    "quest_cn": "在水母上恢复能量"
+  }
+ ],
+ "tomorrow": [
+  {
+   "date": "2026-11-16",
+   "quest_id": "receive_a_gift",
+   "quest_cn": "接受一位朋友的礼物"
+  },
+  {
+   "date": "2026-11-16",
+   "quest_id": "high_five_someone",
+   "quest_cn": "和朋友击掌"
+  },
+  {
+   "date": "2026-11-16",
+   "quest_id": "recharge_by_shroom",
+   "quest_cn": "在荧光小菇旁恢复能量"
+  },
+  {
+   "date": "2026-11-16",
+   "quest_id": "pickup_30_wax",
+   "quest_cn": "收集30点烛火"
   }
  ],
  "raw_count": 8
