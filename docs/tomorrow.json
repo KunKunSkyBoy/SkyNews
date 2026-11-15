@@ -1,32 +1,10 @@
 {
  "schema": 1,
- "generated_at": "2026-11-14T16:59:46Z",
- "fetched_day": "2026-11-15",
- "today_date": "2026-11-15",
- "tomorrow_date": "2026-11-16",
+ "generated_at": "2026-11-15T20:06:01Z",
+ "fetched_day": "2026-11-16",
+ "today_date": "2026-11-16",
+ "tomorrow_date": "2026-11-17",
  "today": [
-  {
-   "date": "2026-11-15",
-   "quest_id": "light_20_candles",
-   "quest_cn": "点燃20根蜡烛"
-  },
-  {
-   "date": "2026-11-15",
-   "quest_id": "wave_at_a_friend",
-   "quest_cn": "向一位朋友招手"
-  },
-  {
-   "date": "2026-11-15",
-   "quest_id": "melt_10_darkstones",
-   "quest_cn": "净化10株黑暗植物"
-  },
-  {
-   "date": "2026-11-15",
-   "quest_id": "recharge_by_jellyfish",
-   "quest_cn": "在水母上恢复能量"
-  }
- ],
- "tomorrow": [
   {
    "date": "2026-11-16",
    "quest_id": "receive_a_gift",
@@ -46,6 +24,28 @@
    "date": "2026-11-16",
    "quest_id": "pickup_30_wax",
    "quest_cn": "收集30点烛火"
+  }
+ ],
+ "tomorrow": [
+  {
+   "date": "2026-11-17",
+   "quest_id": "sit_at_a_bench_with_a_stranger",
+   "quest_cn": "和陌生人一起坐在长凳上"
+  },
+  {
+   "date": "2026-11-17",
+   "quest_id": "light_20_candles",
+   "quest_cn": "点燃20根蜡烛"
+  },
+  {
+   "date": "2026-11-17",
+   "quest_id": "melt_10_darkstones",
+   "quest_cn": "净化10株黑暗植物"
+  },
+  {
+   "date": "2026-11-17",
+   "quest_id": "spirit_newchoreo1",
+   "quest_cn": "谦逊舞者在圆梦村等你，它需要你的帮助……"
   }
  ],
  "raw_count": 8
