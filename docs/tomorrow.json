@@ -1,32 +1,10 @@
 {
  "schema": 1,
- "generated_at": "2026-11-15T20:06:01Z",
- "fetched_day": "2026-11-16",
- "today_date": "2026-11-16",
- "tomorrow_date": "2026-11-17",
+ "generated_at": "2026-11-16T22:05:13Z",
+ "fetched_day": "2026-11-17",
+ "today_date": "2026-11-17",
+ "tomorrow_date": "2026-11-18",
  "today": [
-  {
-   "date": "2026-11-16",
-   "quest_id": "receive_a_gift",
-   "quest_cn": "接受一位朋友的礼物"
-  },
-  {
-   "date": "2026-11-16",
-   "quest_id": "high_five_someone",
-   "quest_cn": "和朋友击掌"
-  },
-  {
-   "date": "2026-11-16",
-   "quest_id": "recharge_by_shroom",
-   "quest_cn": "在荧光小菇旁恢复能量"
-  },
-  {
-   "date": "2026-11-16",
-   "quest_id": "pickup_30_wax",
-   "quest_cn": "收集30点烛火"
-  }
- ],
- "tomorrow": [
   {
    "date": "2026-11-17",
    "quest_id": "sit_at_a_bench_with_a_stranger",
@@ -46,6 +24,28 @@
    "date": "2026-11-17",
    "quest_id": "spirit_newchoreo1",
    "quest_cn": "谦逊舞者在圆梦村等你，它需要你的帮助……"
+  }
+ ],
+ "tomorrow": [
+  {
+   "date": "2026-11-18",
+   "quest_id": "pick_up_1_crab",
+   "quest_cn": "拾起一只螃蟹"
+  },
+  {
+   "date": "2026-11-18",
+   "quest_id": "wave_at_a_player",
+   "quest_cn": "向一位玩家招手"
+  },
+  {
+   "date": "2026-11-18",
+   "quest_id": "make_a_new_acquaintance",
+   "quest_cn": "点亮一位玩家"
+  },
+  {
+   "date": "2026-11-18",
+   "quest_id": "world_quest_dusk_lookaround",
+   "quest_cn": "前往暮土-远古战场，重温瞭望哨兵的回忆"
   }
  ],
  "raw_count": 8
