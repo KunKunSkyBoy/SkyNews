@@ -1,32 +1,10 @@
 {
  "schema": 1,
- "generated_at": "2026-11-16T22:05:13Z",
- "fetched_day": "2026-11-17",
- "today_date": "2026-11-17",
- "tomorrow_date": "2026-11-18",
+ "generated_at": "2026-11-17T21:55:33Z",
+ "fetched_day": "2026-11-18",
+ "today_date": "2026-11-18",
+ "tomorrow_date": "2026-11-19",
  "today": [
-  {
-   "date": "2026-11-17",
-   "quest_id": "sit_at_a_bench_with_a_stranger",
-   "quest_cn": "和陌生人一起坐在长凳上"
-  },
-  {
-   "date": "2026-11-17",
-   "quest_id": "light_20_candles",
-   "quest_cn": "点燃20根蜡烛"
-  },
-  {
-   "date": "2026-11-17",
-   "quest_id": "melt_10_darkstones",
-   "quest_cn": "净化10株黑暗植物"
-  },
-  {
-   "date": "2026-11-17",
-   "quest_id": "spirit_newchoreo1",
-   "quest_cn": "谦逊舞者在圆梦村等你，它需要你的帮助……"
-  }
- ],
- "tomorrow": [
   {
    "date": "2026-11-18",
    "quest_id": "pick_up_1_crab",
@@ -46,6 +24,28 @@
    "date": "2026-11-18",
    "quest_id": "world_quest_dusk_lookaround",
    "quest_cn": "前往暮土-远古战场，重温瞭望哨兵的回忆"
+  }
+ ],
+ "tomorrow": [
+  {
+   "date": "2026-11-19",
+   "quest_id": "lightseeker3_night_shelter",
+   "quest_cn": "在禁阁的庇护所中捕捉浮动的光点"
+  },
+  {
+   "date": "2026-11-19",
+   "quest_id": "recharge_by_jellyfish",
+   "quest_cn": "在水母上恢复能量"
+  },
+  {
+   "date": "2026-11-19",
+   "quest_id": "bow_at_a_player",
+   "quest_cn": "向一位玩家鞠躬"
+  },
+  {
+   "date": "2026-11-19",
+   "quest_id": "world_quest_night_float",
+   "quest_cn": "前往禁阁-四层，重温冥想大师的回忆"
   }
  ],
  "raw_count": 8
