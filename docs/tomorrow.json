@@ -1,32 +1,10 @@
 {
  "schema": 1,
- "generated_at": "2026-11-17T21:55:33Z",
- "fetched_day": "2026-11-18",
- "today_date": "2026-11-18",
- "tomorrow_date": "2026-11-19",
+ "generated_at": "2026-11-18T19:38:01Z",
+ "fetched_day": "2026-11-19",
+ "today_date": "2026-11-19",
+ "tomorrow_date": "2026-11-20",
  "today": [
-  {
-   "date": "2026-11-18",
-   "quest_id": "pick_up_1_crab",
-   "quest_cn": "拾起一只螃蟹"
-  },
-  {
-   "date": "2026-11-18",
-   "quest_id": "wave_at_a_player",
-   "quest_cn": "向一位玩家招手"
-  },
-  {
-   "date": "2026-11-18",
-   "quest_id": "make_a_new_acquaintance",
-   "quest_cn": "点亮一位玩家"
-  },
-  {
-   "date": "2026-11-18",
-   "quest_id": "world_quest_dusk_lookaround",
-   "quest_cn": "前往暮土-远古战场，重温瞭望哨兵的回忆"
-  }
- ],
- "tomorrow": [
   {
    "date": "2026-11-19",
    "quest_id": "lightseeker3_night_shelter",
@@ -46,6 +24,28 @@
    "date": "2026-11-19",
    "quest_id": "world_quest_night_float",
    "quest_cn": "前往禁阁-四层，重温冥想大师的回忆"
+  }
+ ],
+ "tomorrow": [
+  {
+   "date": "2026-11-20",
+   "quest_id": "shoute_at_5_crabs",
+   "quest_cn": "掀翻5只螃蟹"
+  },
+  {
+   "date": "2026-11-20",
+   "quest_id": "sit_at_a_bench_with_a_stranger",
+   "quest_cn": "和陌生人一起坐在长凳上"
+  },
+  {
+   "date": "2026-11-20",
+   "quest_id": "recharge_by_shroom",
+   "quest_cn": "在荧光小菇旁恢复能量"
+  },
+  {
+   "date": "2026-11-20",
+   "quest_id": "light_20_candles",
+   "quest_cn": "点燃20根蜡烛"
   }
  ],
  "raw_count": 8
