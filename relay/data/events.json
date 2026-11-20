@@ -177,16 +177,6 @@
   },
   {
     "enabled": true,
-    "id": "bonus-6af3e84318a5e875e214303e-gzsej4",
-    "type": "bonus",
-    "title": "【双倍】双倍心火",
-    "start": "2026-11-13T16:00:00.000Z",
-    "end": "2026-11-20T15:59:00.000Z",
-    "sourceFeedId": "6af3e84318a5e875e214303e",
-    "_source": "netease"
-  },
-  {
-    "enabled": true,
     "id": "bonus-6a36104746804c0398433bec-11n995a",
     "sourceFeedId": "6a36104746804c0398433bec",
     "type": "bonus",
